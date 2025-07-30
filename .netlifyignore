@@ -1,0 +1,14 @@
+# Exclude all documentation files except README.md
+*.md
+!README.md
+
+# Exclude scripts that contain environment variable references
+scripts/verify-security.js
+
+# Exclude draft documentation
+../draft/
+
+# Exclude development files
+../.env.example
+.env.example
+*.example

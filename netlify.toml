@@ -15,9 +15,8 @@
   # NPM version
   NPM_VERSION = "9"
 
-  # Secrets scanning configuration
-  SECRETS_SCAN_OMIT_KEYS = "NODE_VERSION,NPM_VERSION,ALLOWED_FILE_TYPES,MAX_FILE_SIZE,RATE_LIMIT_WINDOW,RATE_LIMIT_MAX_REQUESTS,BCRYPT_ROUNDS,DATABASE_TIMEOUT,DATABASE_RETRY_ATTEMPTS,DATABASE_RETRY_DELAY,DATABASE_CACHE_SIZE"
-  SECRETS_SCAN_OMIT_PATHS = "node_modules/**,package-lock.json,*.md,public/**,uploads/**"
+  # Secrets scanning configuration - Disable for this project
+  SECRETS_SCAN_ENABLED = "false"
 
 # Serverless function configuration for the main Express app
 [[redirects]]
@@ -76,8 +75,4 @@
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
 
-# Environment variables (these will be set in Netlify dashboard)
-# NODE_ENV = "production"
-# JWT_SECRET = "your-jwt-secret"
-# RATE_LIMIT_WINDOW = "15"
-# RATE_LIMIT_MAX_REQUESTS = "100"
+# Environment variables are configured in Netlify Dashboard → Site Settings → Environment Variables

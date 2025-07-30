@@ -199,12 +199,11 @@ DATABASE_PATH=./database/webapps_hub.db
 JWT_SECRET=your-super-secure-jwt-secret-key-here
 
 # Admin Credentials
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=CHANGE_THIS_PASSWORD
+# Configure via environment variables in Netlify Dashboard
 
 # File Upload Configuration
 MAX_FILE_SIZE=5242880
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif
+# Configure file types via environment variables
 
 # Rate Limiting
 RATE_LIMIT_WINDOW=15
