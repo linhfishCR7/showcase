@@ -67,7 +67,9 @@ class Database {
                             process.env.NETLIFY ||
                             process.env.VERCEL ||
                             process.cwd().includes('/tmp') ||
-                            process.cwd().includes('lambda');
+                            process.cwd().includes('lambda') ||
+                            process.cwd().includes('/var/task') ||  // Netlify
+                            process.cwd().includes('/var/runtime'); // AWS Lambda
 
         const path = isServerless
             ? `/tmp/${this.dbName}`

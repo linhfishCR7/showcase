@@ -16,6 +16,9 @@ exports.handler = async (event, context) => {
         // Environment variables (safe ones only)
         debug.environment = {
             NODE_ENV: process.env.NODE_ENV,
+            DATABASE_NAME: process.env.DATABASE_NAME,
+            DATABASE_PATH: process.env.DATABASE_PATH,
+            NETLIFY: process.env.NETLIFY,
             hasJWT_SECRET: !!process.env.JWT_SECRET,
             hasADMIN_EMAIL: !!process.env.ADMIN_EMAIL,
             hasADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
