@@ -56,16 +56,53 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Initialize database connection
 let dbInitialized = false;
+let dbInitializationError = null;
+
 async function initializeDatabase() {
-    if (!dbInitialized) {
+    if (!dbInitialized && !dbInitializationError) {
         try {
+            console.log('Initializing database...');
+            console.log('NODE_ENV:', process.env.NODE_ENV);
+            console.log('Database path will be:', process.env.NODE_ENV === 'production' ? '/tmp/webapps_hub.db' : './database/webapps_hub.db');
+
             await database.connect();
             await database.createTables();
+
+            // Create admin user if it doesn't exist
+            const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+            if (!adminEmail || !adminPassword) {
+                throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+            }
+
+            // Check if admin exists
+            const existingAdmin = await database.get(
+                'SELECT id FROM admin_users WHERE email = ?',
+                [adminEmail]
+            );
+
+            if (!existingAdmin) {
+                const bcrypt = require('bcryptjs');
+                const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+                const passwordHash = await bcrypt.hash(adminPassword, saltRounds);
+
+                await database.run(
+                    'INSERT INTO admin_users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
+                    [adminEmail, passwordHash, 'Administrator', 'admin']
+                );
+                console.log('Admin user created successfully');
+            }
+
             dbInitialized = true;
             console.log('Database initialized successfully');
         } catch (error) {
             console.error('Database initialization failed:', error);
+            dbInitializationError = error;
+            throw error; // Re-throw to prevent function from continuing
         }
+    } else if (dbInitializationError) {
+        throw dbInitializationError; // Re-throw previous error
     }
 }
 
@@ -109,8 +146,26 @@ app.use((req, res) => {
 
 // Initialize database before handling requests
 const handler = async (event, context) => {
-    await initializeDatabase();
-    return serverlessHandler(event, context);
+    try {
+        await initializeDatabase();
+        return serverlessHandler(event, context);
+    } catch (error) {
+        console.error('Function initialization failed:', error);
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+            },
+            body: JSON.stringify({
+                error: 'Internal server error',
+                message: 'Database initialization failed',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            })
+        };
+    }
 };
 
 const serverlessHandler = serverless(app);
