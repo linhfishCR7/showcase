@@ -11,9 +11,13 @@
 [build.environment]
   # Node.js version
   NODE_VERSION = "18"
-  
+
   # NPM version
   NPM_VERSION = "9"
+
+  # Secrets scanning configuration
+  SECRETS_SCAN_OMIT_KEYS = "NODE_VERSION,NPM_VERSION,ALLOWED_FILE_TYPES,MAX_FILE_SIZE,RATE_LIMIT_WINDOW,RATE_LIMIT_MAX_REQUESTS,BCRYPT_ROUNDS,DATABASE_TIMEOUT,DATABASE_RETRY_ATTEMPTS,DATABASE_RETRY_DELAY,DATABASE_CACHE_SIZE"
+  SECRETS_SCAN_OMIT_PATHS = "node_modules/**,package-lock.json,*.md,public/**,uploads/**"
 
 # Serverless function configuration for the main Express app
 [[redirects]]

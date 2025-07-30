@@ -121,10 +121,10 @@ npm start
    - API: http://localhost:3000/api
 
 ### Default Admin Credentials
-- **Email**: admin@webappshub.com
-- **Password**: admin123
+- **Email**: Set via `ADMIN_EMAIL` environment variable
+- **Password**: Set via `ADMIN_PASSWORD` environment variable
 
-⚠️ **Important**: Change the default admin password after first login!
+⚠️ **Important**: Configure secure admin credentials via environment variables!
 
 ## 🚀 Netlify Deployment
 
@@ -199,12 +199,12 @@ DATABASE_PATH=./database/webapps_hub.db
 JWT_SECRET=your-super-secure-jwt-secret-key-here
 
 # Admin Credentials
-ADMIN_EMAIL=admin@webappshub.com
-ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=CHANGE_THIS_PASSWORD
 
 # File Upload Configuration
 MAX_FILE_SIZE=5242880
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif,image/webp
+ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif
 
 # Rate Limiting
 RATE_LIMIT_WINDOW=15

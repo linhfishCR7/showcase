@@ -10,8 +10,8 @@ async function initializeDatabase() {
         await database.createTables();
         
         // Create default admin user
-        const adminEmail = process.env.ADMIN_EMAIL || 'admin@webappshub.com';
-        const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+        const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+        const adminPassword = process.env.ADMIN_PASSWORD || 'CHANGE_THIS_PASSWORD';
         
         // Check if admin already exists
         const existingAdmin = await database.get(

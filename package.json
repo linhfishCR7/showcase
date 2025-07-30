@@ -13,7 +13,8 @@
     "build": "node scripts/netlify-build.js",
     "build-static": "node build-static.js",
     "serve-static": "npx serve public",
-    "deploy-prep": "npm run build && echo 'Ready for Netlify deployment!'",
+    "verify-security": "node scripts/verify-security.js",
+    "deploy-prep": "npm run verify-security && npm run build && echo 'Ready for Netlify deployment!'",
     "netlify-build": "npm run build"
   },
   "keywords": [

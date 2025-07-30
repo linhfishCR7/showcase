@@ -56,10 +56,10 @@ function runSetup() {
                 console.log('   • Frontend: http://localhost:3000');
                 console.log('   • Admin Dashboard: http://localhost:3000/admin');
                 console.log('   • API: http://localhost:3000/api');
-                console.log('\n🔐 Default admin credentials:');
-                console.log('   • Email: admin@webappshub.com');
-                console.log('   • Password: admin123');
-                console.log('\n⚠️  Remember to change the default admin password!');
+                console.log('\n🔐 Admin credentials:');
+                console.log('   • Email: Set via ADMIN_EMAIL environment variable');
+                console.log('   • Password: Set via ADMIN_PASSWORD environment variable');
+                console.log('\n⚠️  Configure secure credentials via environment variables!');
             });
         });
     });
