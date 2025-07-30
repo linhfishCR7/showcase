@@ -48,8 +48,8 @@ app.use('/api/', limiter);
 app.use(compression());
 app.use(morgan('combined'));
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-domain.com'] 
+    origin: process.env.NODE_ENV === 'production'
+        ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['*'])
         : ['http://localhost:3000', 'http://127.0.0.1:3000'],
     credentials: true
 }));
