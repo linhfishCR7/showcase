@@ -19,7 +19,27 @@ This guide covers all environment variables used in the app-showcase-dynamic pro
 |----------|----------|-------------|---------------|-------|
 | `NODE_ENV` | **Yes** | Environment mode | `production` | Affects CORS, error handling, DB path |
 | `PORT` | No | Server port (local dev only) | `3000` | Not used in Netlify serverless |
+
+### 🗄️ Database Configuration
+
+| Variable | Required | Description | Example Value | Notes |
+|----------|----------|-------------|---------------|-------|
 | `DATABASE_PATH` | No | SQLite database path | `./database/webapps_hub.db` | Auto-set to /tmp in production |
+| `DATABASE_NAME` | No | Database filename | `webapps_hub.db` | Allows environment-specific names |
+| `DATABASE_TIMEOUT` | No | Connection timeout (ms) | `10000` | Longer timeout for production |
+| `DATABASE_RETRY_ATTEMPTS` | No | Max retry attempts | `3` | More retries in production |
+| `DATABASE_RETRY_DELAY` | No | Delay between retries (ms) | `1000` | Longer delay in production |
+| `DATABASE_WAL_MODE` | No | Enable WAL mode | `false` | Not beneficial in serverless |
+| `DATABASE_CACHE_SIZE` | No | SQLite cache size (KB) | `4000` | More cache in production |
+| `DATABASE_TEMP_STORE` | No | Temp storage location | `MEMORY` | Use memory for temp in production |
+| `DATABASE_SYNCHRONOUS` | No | Synchronous mode | `NORMAL` | Balance safety vs performance |
+| `DATABASE_JOURNAL_MODE` | No | Journal mode | `MEMORY` | Memory mode for serverless |
+| `DATABASE_FOREIGN_KEYS` | No | Enable foreign key constraints | `true` | Always recommended |
+| `DATABASE_SECURE_DELETE` | No | Secure delete mode | `true` | Overwrite deleted data in production |
+| `DATABASE_INTEGRITY_CHECK` | No | Run integrity check on startup | `false` | Skip for faster cold starts |
+| `DATABASE_LOG_QUERIES` | No | Log SQL queries | `false` | Debug in dev, quiet in prod |
+| `DATABASE_LOG_SLOW_QUERIES` | No | Log slow queries (ms threshold) | `2000` | Different thresholds per environment |
+| `DATABASE_ENABLE_METRICS` | No | Enable performance metrics | `true` | Monitor production performance |
 
 ### 🛡️ Rate Limiting & Security
 

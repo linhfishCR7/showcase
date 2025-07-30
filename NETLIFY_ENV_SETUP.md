@@ -93,6 +93,53 @@ Variable name: ALLOWED_FILE_TYPES
 Value: image/jpeg,image/png,image/gif,image/webp
 ```
 
+#### 🗄️ Database Optimization Variables (Recommended for Production)
+
+```
+Variable name: DATABASE_TIMEOUT
+Value: 10000
+```
+
+```
+Variable name: DATABASE_RETRY_ATTEMPTS
+Value: 5
+```
+
+```
+Variable name: DATABASE_CACHE_SIZE
+Value: 4000
+```
+
+```
+Variable name: DATABASE_TEMP_STORE
+Value: MEMORY
+```
+
+```
+Variable name: DATABASE_SYNCHRONOUS
+Value: NORMAL
+```
+
+```
+Variable name: DATABASE_JOURNAL_MODE
+Value: MEMORY
+```
+
+```
+Variable name: DATABASE_SECURE_DELETE
+Value: true
+```
+
+```
+Variable name: DATABASE_LOG_SLOW_QUERIES
+Value: 2000
+```
+
+```
+Variable name: DATABASE_ENABLE_METRICS
+Value: true
+```
+
 ### Step 4: Configure Email (Optional)
 
 If you want newsletter functionality:

@@ -7,13 +7,75 @@ class Database {
         this.db = null;
         this.isConnected = false;
         this.isClosing = false;
-        // Use /tmp directory for Netlify serverless functions
-        this.dbPath = process.env.NODE_ENV === 'production'
-            ? '/tmp/webapps_hub.db'
-            : (process.env.DATABASE_PATH || './database/webapps_hub.db');
+
+        // Database path configuration
+        this.dbName = process.env.DATABASE_NAME || 'webapps_hub.db';
+        this.dbPath = this.getDatabasePath();
+
+        // Performance and configuration settings
+        this.config = {
+            timeout: parseInt(process.env.DATABASE_TIMEOUT) || 10000,
+            retryAttempts: parseInt(process.env.DATABASE_RETRY_ATTEMPTS) || 3,
+            retryDelay: parseInt(process.env.DATABASE_RETRY_DELAY) || 1000,
+            walMode: process.env.DATABASE_WAL_MODE === 'true',
+            cacheSize: parseInt(process.env.DATABASE_CACHE_SIZE) || 4000,
+            tempStore: process.env.DATABASE_TEMP_STORE || 'DEFAULT',
+            synchronous: process.env.DATABASE_SYNCHRONOUS || 'NORMAL',
+            journalMode: process.env.DATABASE_JOURNAL_MODE || (process.env.NODE_ENV === 'production' ? 'MEMORY' : 'DELETE'),
+            foreignKeys: process.env.DATABASE_FOREIGN_KEYS !== 'false',
+            secureDelete: process.env.DATABASE_SECURE_DELETE === 'true',
+            integrityCheck: process.env.DATABASE_INTEGRITY_CHECK === 'true',
+            logQueries: process.env.DATABASE_LOG_QUERIES === 'true',
+            logSlowQueries: parseInt(process.env.DATABASE_LOG_SLOW_QUERIES) || 1000,
+            enableMetrics: process.env.DATABASE_ENABLE_METRICS === 'true'
+        };
+
+        // Metrics tracking
+        this.metrics = {
+            connectionCount: 0,
+            queryCount: 0,
+            totalQueryTime: 0,
+            slowQueries: 0
+        };
+    }
+
+    getDatabasePath() {
+        // Use explicit DATABASE_PATH if provided
+        if (process.env.DATABASE_PATH) {
+            return process.env.DATABASE_PATH;
+        }
+
+        // Auto-configure based on environment
+        return process.env.NODE_ENV === 'production'
+            ? `/tmp/${this.dbName}`
+            : `./database/${this.dbName}`;
     }
 
     async connect() {
+        return this.connectWithRetry();
+    }
+
+    async connectWithRetry() {
+        for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
+            try {
+                await this.connectOnce();
+                await this.configureDatabase();
+                if (this.config.integrityCheck) {
+                    await this.checkIntegrity();
+                }
+                this.metrics.connectionCount++;
+                return;
+            } catch (error) {
+                console.warn(`Database connection attempt ${attempt} failed:`, error.message);
+                if (attempt === this.config.retryAttempts) {
+                    throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+            }
+        }
+    }
+
+    async connectOnce() {
         return new Promise((resolve, reject) => {
             // Ensure database directory exists
             const dbDir = path.dirname(this.dbPath);
@@ -22,21 +84,60 @@ class Database {
                 fs.mkdirSync(dbDir, { recursive: true });
             }
 
+            const timeout = setTimeout(() => {
+                reject(new Error(`Database connection timeout after ${this.config.timeout}ms`));
+            }, this.config.timeout);
+
             this.db = new sqlite3.Database(this.dbPath, (err) => {
+                clearTimeout(timeout);
                 if (err) {
                     console.error('Error connecting to SQLite database:', err);
                     this.isConnected = false;
                     reject(err);
                 } else {
-                    console.log('Connected to SQLite database');
+                    console.log(`Connected to SQLite database: ${this.dbPath}`);
                     this.isConnected = true;
                     this.isClosing = false;
-                    // Enable foreign keys
-                    this.db.run('PRAGMA foreign_keys = ON');
                     resolve();
                 }
             });
         });
+    }
+
+    async configureDatabase() {
+        const pragmas = [
+            `PRAGMA foreign_keys = ${this.config.foreignKeys ? 'ON' : 'OFF'}`,
+            `PRAGMA cache_size = -${this.config.cacheSize}`,
+            `PRAGMA temp_store = ${this.config.tempStore}`,
+            `PRAGMA synchronous = ${this.config.synchronous}`,
+            `PRAGMA journal_mode = ${this.config.journalMode}`,
+            `PRAGMA secure_delete = ${this.config.secureDelete ? 'ON' : 'OFF'}`
+        ];
+
+        if (this.config.walMode && this.config.journalMode === 'WAL') {
+            pragmas.push('PRAGMA wal_autocheckpoint = 1000');
+        }
+
+        for (const pragma of pragmas) {
+            await this.run(pragma);
+        }
+
+        if (this.config.logQueries) {
+            console.log('Database configured with pragmas:', pragmas);
+        }
+    }
+
+    async checkIntegrity() {
+        try {
+            const result = await this.get('PRAGMA integrity_check');
+            if (result && result.integrity_check !== 'ok') {
+                console.warn('Database integrity check failed:', result);
+            } else if (this.config.logQueries) {
+                console.log('Database integrity check passed');
+            }
+        } catch (error) {
+            console.warn('Database integrity check error:', error.message);
+        }
     }
 
     async createTables() {
@@ -162,25 +263,65 @@ class Database {
         console.log('Database tables created successfully');
     }
 
-    // Promisify database operations
+    // Promisify database operations with logging and metrics
     run(sql, params = []) {
+        const startTime = Date.now();
         return new Promise((resolve, reject) => {
             this.db.run(sql, params, function(err) {
+                const duration = Date.now() - startTime;
+
                 if (err) {
+                    console.error(`[DB ERROR] ${sql}:`, err.message);
                     reject(err);
                 } else {
+                    // Log query if enabled
+                    if (this.config && this.config.logQueries) {
+                        console.log(`[DB] ${sql}`, params);
+                    }
+
+                    // Track metrics
+                    if (this.metrics) {
+                        this.metrics.queryCount++;
+                        this.metrics.totalQueryTime += duration;
+
+                        // Log slow queries
+                        if (duration > this.config.logSlowQueries) {
+                            console.warn(`[DB SLOW] ${duration}ms: ${sql}`);
+                            this.metrics.slowQueries++;
+                        }
+                    }
+
                     resolve({ id: this.lastID, changes: this.changes });
                 }
-            });
+            }.bind(this));
         });
     }
 
     get(sql, params = []) {
+        const startTime = Date.now();
         return new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
+                const duration = Date.now() - startTime;
+
                 if (err) {
+                    console.error(`[DB ERROR] ${sql}:`, err.message);
                     reject(err);
                 } else {
+                    // Log query if enabled
+                    if (this.config.logQueries) {
+                        console.log(`[DB] ${sql}`, params);
+                    }
+
+                    // Track metrics
+                    this.metrics.queryCount++;
+                    this.metrics.totalQueryTime += duration;
+
+                    // Log slow queries
+                    if (duration > this.config.logSlowQueries) {
+                        console.warn(`[DB SLOW] ${duration}ms: ${sql}`);
+                        this.metrics.slowQueries++;
+                    }
+
                     resolve(row);
                 }
             });
@@ -188,11 +329,30 @@ class Database {
     }
 
     all(sql, params = []) {
+        const startTime = Date.now();
         return new Promise((resolve, reject) => {
             this.db.all(sql, params, (err, rows) => {
+                const duration = Date.now() - startTime;
+
                 if (err) {
+                    console.error(`[DB ERROR] ${sql}:`, err.message);
                     reject(err);
                 } else {
+                    // Log query if enabled
+                    if (this.config.logQueries) {
+                        console.log(`[DB] ${sql}`, params, `(${rows ? rows.length : 0} rows)`);
+                    }
+
+                    // Track metrics
+                    this.metrics.queryCount++;
+                    this.metrics.totalQueryTime += duration;
+
+                    // Log slow queries
+                    if (duration > this.config.logSlowQueries) {
+                        console.warn(`[DB SLOW] ${duration}ms: ${sql} (${rows ? rows.length : 0} rows)`);
+                        this.metrics.slowQueries++;
+                    }
+
                     resolve(rows);
                 }
             });
@@ -237,11 +397,51 @@ class Database {
             return;
         }
 
+        // Log metrics before closing
+        if (this.config.enableMetrics) {
+            this.logMetrics();
+        }
+
         try {
             await this.close();
         } catch (error) {
             console.warn('Warning during database close:', error.message);
         }
+    }
+
+    // Collect and log database performance metrics
+    logMetrics() {
+        const avgQueryTime = this.metrics.queryCount > 0
+            ? (this.metrics.totalQueryTime / this.metrics.queryCount).toFixed(2)
+            : 0;
+
+        console.log('[DB METRICS]', {
+            connections: this.metrics.connectionCount,
+            totalQueries: this.metrics.queryCount,
+            avgQueryTime: `${avgQueryTime}ms`,
+            slowQueries: this.metrics.slowQueries,
+            totalQueryTime: `${this.metrics.totalQueryTime}ms`
+        });
+    }
+
+    // Get current database metrics
+    getMetrics() {
+        return {
+            ...this.metrics,
+            avgQueryTime: this.metrics.queryCount > 0
+                ? this.metrics.totalQueryTime / this.metrics.queryCount
+                : 0
+        };
+    }
+
+    // Reset metrics (useful for testing)
+    resetMetrics() {
+        this.metrics = {
+            connectionCount: 0,
+            queryCount: 0,
+            totalQueryTime: 0,
+            slowQueries: 0
+        };
     }
 }
 
