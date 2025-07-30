@@ -14,6 +14,15 @@ const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 
+// Import admin security middleware
+const {
+    adminRateLimit,
+    authRateLimit,
+    securityHeaders,
+    logAdminAction,
+    sanitizeInput
+} = require('./middleware/admin-security');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -64,10 +73,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // - https://linhfishcr7.github.io/expense-tracker/
 // - https://linhfishcr7.github.io/digital-drawing-canvas/
 
-// API Routes
-app.use('/api/auth', authRoutes);
+// API Routes with security middleware
+app.use('/api/auth', authRateLimit, sanitizeInput, authRoutes);
 app.use('/api', apiRoutes);
-app.use('/admin/api', adminRoutes);
+app.use('/admin/api', adminRateLimit, securityHeaders, sanitizeInput, logAdminAction, adminRoutes);
 
 // Serve admin dashboard
 app.get('/admin/*', (req, res) => {

@@ -292,6 +292,19 @@ class Database {
                 uploaded_by INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (uploaded_by) REFERENCES admin_users (id)
+            )`,
+
+            // Security logs table
+            `CREATE TABLE IF NOT EXISTS security_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                event_data TEXT,
+                user_id INTEGER,
+                user_agent TEXT,
+                ip_address TEXT,
+                url TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES admin_users (id)
             )`
         ];
 

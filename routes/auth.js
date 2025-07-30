@@ -108,6 +108,28 @@ router.post('/register', [
     }
 });
 
+// Verify token (frontend expects /verify endpoint)
+router.get('/verify', verifyToken, async (req, res) => {
+    try {
+        const user = await database.get(
+            'SELECT id, email, name, role, last_login, created_at FROM admin_users WHERE id = ?',
+            [req.user.id]
+        );
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            valid: true,
+            user: user
+        });
+    } catch (error) {
+        console.error('Token verification error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Verify token and get user info
 router.get('/me', verifyToken, async (req, res) => {
     try {

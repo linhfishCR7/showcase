@@ -1,0 +1,2 @@
+# This file ensures the uploads directory exists in the repository
+# Uploaded files will be stored here but are ignored by git

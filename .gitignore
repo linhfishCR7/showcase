@@ -211,5 +211,7 @@ temp/
 .tmp/
 
 # Upload directories (if any)
-uploads/
-public/uploads/
+uploads/*
+!uploads/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep

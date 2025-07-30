@@ -1,0 +1,2 @@
+# This file ensures the public/uploads directory exists in the repository
+# Uploaded files will be served from here but are ignored by git

@@ -10,6 +10,7 @@
     "seed-db": "node scripts/seed-database.js",
     "generate-images": "node scripts/generate-images.js",
     "setup": "npm run init-db && npm run seed-db && npm run generate-images",
+    "setup-admin": "node scripts/setup-admin.js",
     "build": "node scripts/minimal-build.js",
     "build-static": "node build-static.js",
     "serve-static": "npx serve public",

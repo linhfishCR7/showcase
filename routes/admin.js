@@ -1,13 +1,124 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+const crypto = require('crypto');
 const database = require('../config/database');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { uploadRateLimit, validateFileUpload } = require('../middleware/admin-security');
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../public/uploads');
+        try {
+            await fs.mkdir(uploadDir, { recursive: true });
+            cb(null, uploadDir);
+        } catch (error) {
+            cb(error);
+        }
+    },
+    filename: (req, file, cb) => {
+        // Generate secure filename
+        const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
+        const ext = path.extname(file.originalname);
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '').substring(0, 50);
+        cb(null, `${uniqueSuffix}-${safeName}${ext}`);
+    }
+});
+
+// File filter for security
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        'image/webp': '.webp'
+    };
+
+    if (allowedTypes[file.mimetype]) {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 2 // Maximum 2 files per request
+    }
+});
+
+// CSRF token storage (in production, use Redis or database)
+const csrfTokens = new Map();
+
+// Generate CSRF token
+const generateCSRFToken = () => {
+    return crypto.randomBytes(32).toString('hex');
+};
 
 // Apply authentication to all admin routes
 router.use(verifyToken);
 router.use(requireAdmin);
+
+// CSRF token endpoint
+router.get('/csrf-token', (req, res) => {
+    try {
+        const token = generateCSRFToken();
+        const userId = req.user.id;
+
+        // Store token with expiry (30 minutes)
+        csrfTokens.set(`${userId}-${token}`, {
+            userId: userId,
+            expires: Date.now() + (30 * 60 * 1000)
+        });
+
+        // Clean up expired tokens
+        for (const [key, value] of csrfTokens.entries()) {
+            if (value.expires < Date.now()) {
+                csrfTokens.delete(key);
+            }
+        }
+
+        res.json({ token });
+    } catch (error) {
+        console.error('CSRF token generation error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// CSRF validation middleware
+const validateCSRF = (req, res, next) => {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+        const token = req.headers['x-csrf-token'] || req.body._csrf;
+
+        if (!token) {
+            return res.status(403).json({ error: 'CSRF token required' });
+        }
+
+        const tokenKey = `${req.user.id}-${token}`;
+        const tokenData = csrfTokens.get(tokenKey);
+
+        if (!tokenData || tokenData.expires < Date.now() || tokenData.userId !== req.user.id) {
+            return res.status(403).json({ error: 'Invalid CSRF token' });
+        }
+
+        // Token is valid, continue
+        next();
+    } else {
+        // GET requests don't need CSRF validation
+        next();
+    }
+};
+
+// Apply CSRF validation to state-changing operations
+router.use(validateCSRF);
 
 // Dashboard statistics
 router.get('/dashboard/stats', async (req, res) => {
@@ -96,14 +207,45 @@ router.get('/applications', [
     }
 });
 
+// Get single application
+router.get('/applications/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const application = await database.get(
+            'SELECT * FROM applications WHERE id = ?',
+            [id]
+        );
+
+        if (!application) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+
+        // Parse JSON fields
+        const formattedApp = {
+            ...application,
+            features: application.features ? JSON.parse(application.features) : [],
+            tags: application.tags ? application.tags.split(',').map(tag => tag.trim()) : []
+        };
+
+        res.json({ application: formattedApp });
+    } catch (error) {
+        console.error('Get application error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Create application
-router.post('/applications', [
+router.post('/applications', uploadRateLimit, upload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'screenshot', maxCount: 1 }
+]), validateFileUpload, [
     body('name').isLength({ min: 2 }).trim(),
     body('short_name').isLength({ min: 2 }).trim(),
     body('description').isLength({ min: 10 }).trim(),
     body('category').isLength({ min: 2 }).trim(),
     body('app_url').isURL(),
-    body('features').isArray(),
+    body('features').optional().isString(), // Will be parsed as JSON
     body('tags').optional().isString(),
     body('status').optional().isIn(['active', 'inactive'])
 ], async (req, res) => {
@@ -115,18 +257,40 @@ router.post('/applications', [
 
         const {
             name, short_name, description, long_description, category,
-            tags, logo_url, screenshot_url, app_url, install_url,
-            features, status = 'active'
+            tags, app_url, install_url, features, status = 'active'
         } = req.body;
 
+        // Handle file uploads
+        let logo_url = req.body.logo_url || null;
+        let screenshot_url = req.body.screenshot_url || null;
+
+        if (req.files) {
+            if (req.files.logo && req.files.logo[0]) {
+                logo_url = `/uploads/${req.files.logo[0].filename}`;
+            }
+            if (req.files.screenshot && req.files.screenshot[0]) {
+                screenshot_url = `/uploads/${req.files.screenshot[0].filename}`;
+            }
+        }
+
+        // Parse features if it's a string
+        let parsedFeatures = [];
+        if (features) {
+            try {
+                parsedFeatures = typeof features === 'string' ? JSON.parse(features) : features;
+            } catch (e) {
+                parsedFeatures = [];
+            }
+        }
+
         const result = await database.run(
-            `INSERT INTO applications 
-            (name, short_name, description, long_description, category, tags, logo_url, screenshot_url, app_url, install_url, features, status) 
+            `INSERT INTO applications
+            (name, short_name, description, long_description, category, tags, logo_url, screenshot_url, app_url, install_url, features, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 name, short_name, description, long_description, category,
                 tags, logo_url, screenshot_url, app_url, install_url,
-                JSON.stringify(features), status
+                JSON.stringify(parsedFeatures), status
             ]
         );
 
@@ -141,13 +305,16 @@ router.post('/applications', [
 });
 
 // Update application
-router.put('/applications/:id', [
+router.put('/applications/:id', uploadRateLimit, upload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'screenshot', maxCount: 1 }
+]), validateFileUpload, [
     body('name').optional().isLength({ min: 2 }).trim(),
     body('short_name').optional().isLength({ min: 2 }).trim(),
     body('description').optional().isLength({ min: 10 }).trim(),
     body('category').optional().isLength({ min: 2 }).trim(),
     body('app_url').optional().isURL(),
-    body('features').optional().isArray(),
+    body('features').optional().isString(), // Will be parsed as JSON
     body('status').optional().isIn(['active', 'inactive'])
 ], async (req, res) => {
     try {
@@ -160,11 +327,33 @@ router.put('/applications/:id', [
         const updateFields = [];
         const updateValues = [];
 
+        // Handle file uploads first
+        if (req.files) {
+            if (req.files.logo && req.files.logo[0]) {
+                updateFields.push('logo_url = ?');
+                updateValues.push(`/uploads/${req.files.logo[0].filename}`);
+            }
+            if (req.files.screenshot && req.files.screenshot[0]) {
+                updateFields.push('screenshot_url = ?');
+                updateValues.push(`/uploads/${req.files.screenshot[0].filename}`);
+            }
+        }
+
         // Build dynamic update query
         const allowedFields = [
             'name', 'short_name', 'description', 'long_description', 'category',
-            'tags', 'logo_url', 'screenshot_url', 'app_url', 'install_url', 'status'
+            'tags', 'app_url', 'install_url', 'status'
         ];
+
+        // Handle URL fields only if not uploading files
+        if (req.body.logo_url !== undefined && (!req.files || !req.files.logo)) {
+            updateFields.push('logo_url = ?');
+            updateValues.push(req.body.logo_url);
+        }
+        if (req.body.screenshot_url !== undefined && (!req.files || !req.files.screenshot)) {
+            updateFields.push('screenshot_url = ?');
+            updateValues.push(req.body.screenshot_url);
+        }
 
         for (const field of allowedFields) {
             if (req.body[field] !== undefined) {
@@ -174,8 +363,14 @@ router.put('/applications/:id', [
         }
 
         if (req.body.features !== undefined) {
+            let parsedFeatures = [];
+            try {
+                parsedFeatures = typeof req.body.features === 'string' ? JSON.parse(req.body.features) : req.body.features;
+            } catch (e) {
+                parsedFeatures = [];
+            }
             updateFields.push('features = ?');
-            updateValues.push(JSON.stringify(req.body.features));
+            updateValues.push(JSON.stringify(parsedFeatures));
         }
 
         if (updateFields.length === 0) {
@@ -234,7 +429,28 @@ router.get('/testimonials', async (req, res) => {
     }
 });
 
-router.post('/testimonials', [
+// Get single testimonial
+router.get('/testimonials/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const testimonial = await database.get(
+            'SELECT * FROM testimonials WHERE id = ?',
+            [id]
+        );
+
+        if (!testimonial) {
+            return res.status(404).json({ error: 'Testimonial not found' });
+        }
+
+        res.json({ testimonial });
+    } catch (error) {
+        console.error('Get testimonial error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/testimonials', uploadRateLimit, upload.single('avatar'), validateFileUpload, [
     body('name').isLength({ min: 2 }).trim(),
     body('title').optional().isLength({ min: 2 }).trim(),
     body('content').isLength({ min: 10 }).trim(),
@@ -247,7 +463,13 @@ router.post('/testimonials', [
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const { name, title, content, avatar_url, rating = 5, status = 'active' } = req.body;
+        const { name, title, content, rating = 5, status = 'active' } = req.body;
+
+        // Handle avatar upload
+        let avatar_url = req.body.avatar_url || null;
+        if (req.file) {
+            avatar_url = `/uploads/${req.file.filename}`;
+        }
 
         const result = await database.run(
             'INSERT INTO testimonials (name, title, content, avatar_url, rating, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -264,7 +486,7 @@ router.post('/testimonials', [
     }
 });
 
-router.put('/testimonials/:id', [
+router.put('/testimonials/:id', uploadRateLimit, upload.single('avatar'), validateFileUpload, [
     body('name').optional().isLength({ min: 2 }).trim(),
     body('title').optional().isLength({ min: 2 }).trim(),
     body('content').optional().isLength({ min: 10 }).trim(),
@@ -281,7 +503,19 @@ router.put('/testimonials/:id', [
         const updateFields = [];
         const updateValues = [];
 
-        const allowedFields = ['name', 'title', 'content', 'avatar_url', 'rating', 'status'];
+        // Handle avatar upload
+        if (req.file) {
+            updateFields.push('avatar_url = ?');
+            updateValues.push(`/uploads/${req.file.filename}`);
+        }
+
+        const allowedFields = ['name', 'title', 'content', 'rating', 'status'];
+
+        // Handle avatar_url only if not uploading file
+        if (req.body.avatar_url !== undefined && !req.file) {
+            updateFields.push('avatar_url = ?');
+            updateValues.push(req.body.avatar_url);
+        }
 
         for (const field of allowedFields) {
             if (req.body[field] !== undefined) {
@@ -381,7 +615,8 @@ router.get('/contact-messages', [
     }
 });
 
-router.put('/contact-messages/:id/status', [
+// Update message status (frontend expects PUT /contact-messages/:id)
+router.put('/contact-messages/:id', [
     body('status').isIn(['read', 'unread'])
 ], async (req, res) => {
     try {
@@ -479,26 +714,99 @@ router.get('/newsletter-subscribers', [
     }
 });
 
+// Update newsletter subscriber status
+router.put('/newsletter-subscribers/:id', [
+    body('status').isIn(['active', 'inactive'])
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const result = await database.run(
+            'UPDATE newsletter_subscribers SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [status, id]
+        );
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Subscriber not found' });
+        }
+
+        res.json({ message: 'Subscriber status updated successfully' });
+    } catch (error) {
+        console.error('Update subscriber status error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Delete newsletter subscriber
+router.delete('/newsletter-subscribers/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await database.run(
+            'DELETE FROM newsletter_subscribers WHERE id = ?',
+            [id]
+        );
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Subscriber not found' });
+        }
+
+        res.json({ message: 'Subscriber deleted successfully' });
+    } catch (error) {
+        console.error('Delete subscriber error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Site content management
-router.get('/content', async (req, res) => {
+router.get('/site-content', async (req, res) => {
     try {
         const content = await database.all(
             'SELECT * FROM site_content ORDER BY section'
         );
 
-        const formattedContent = content.reduce((acc, item) => {
-            acc[item.section] = JSON.parse(item.content);
-            return acc;
-        }, {});
-
-        res.json({ content: formattedContent });
+        res.json({ content });
     } catch (error) {
         console.error('Get content error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-router.put('/content/:section', [
+// Get specific content section
+router.get('/site-content/:section', async (req, res) => {
+    try {
+        const { section } = req.params;
+
+        const content = await database.get(
+            'SELECT * FROM site_content WHERE section = ?',
+            [section]
+        );
+
+        if (!content) {
+            return res.status(404).json({ error: 'Content section not found' });
+        }
+
+        res.json({
+            content: {
+                ...content,
+                content: JSON.parse(content.content)
+            }
+        });
+    } catch (error) {
+        console.error('Get content section error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Update content section (frontend expects POST /site-content)
+router.post('/site-content', [
+    body('section').isLength({ min: 1 }).trim(),
     body('content').isObject()
 ], async (req, res) => {
     try {
@@ -507,8 +815,7 @@ router.put('/content/:section', [
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const { section } = req.params;
-        const { content } = req.body;
+        const { section, content } = req.body;
 
         await database.run(
             'INSERT OR REPLACE INTO site_content (section, content, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
@@ -557,6 +864,56 @@ router.get('/analytics', [
         res.json({ analytics: formattedAnalytics });
     } catch (error) {
         console.error('Get analytics error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Security logging endpoint
+router.post('/security-log', [
+    body('timestamp').isISO8601(),
+    body('event').isLength({ min: 1 }).trim(),
+    body('details').optional().isObject()
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { timestamp, event, details, userAgent, url } = req.body;
+
+        // Log security event to database
+        await database.run(
+            'INSERT INTO security_logs (event_type, event_data, user_id, user_agent, ip_address, url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                event,
+                JSON.stringify(details || {}),
+                req.user.id,
+                userAgent || req.get('User-Agent'),
+                req.ip,
+                url || req.originalUrl,
+                timestamp
+            ]
+        );
+
+        // Also log to analytics for tracking
+        await database.run(
+            'INSERT INTO analytics (event_type, event_data, user_agent, ip_address) VALUES (?, ?, ?, ?)',
+            [
+                'security_event',
+                JSON.stringify({
+                    securityEvent: event,
+                    details: details || {},
+                    userId: req.user.id
+                }),
+                userAgent || req.get('User-Agent'),
+                req.ip
+            ]
+        );
+
+        res.json({ message: 'Security event logged successfully' });
+    } catch (error) {
+        console.error('Security logging error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
