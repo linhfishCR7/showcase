@@ -8,6 +8,9 @@ class AdminDashboard {
         this.sessionWarningTimeout = null;
         this.SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
         this.WARNING_TIME = 5 * 60 * 1000; // 5 minutes before expiry
+        this.csrfToken = null;
+        this.maxFileSize = 5 * 1024 * 1024; // 5MB
+        this.allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
         this.init();
     }
@@ -15,10 +18,13 @@ class AdminDashboard {
     async init() {
         this.initializeTheme();
         this.initKeyboardShortcuts();
+        this.initRateLimiting();
+        this.initSecurity();
 
         if (this.token) {
             try {
                 await this.verifyToken();
+                await this.refreshCsrfToken();
                 this.showDashboard();
                 this.startSessionTimer();
             } catch (error) {
@@ -130,6 +136,7 @@ class AdminDashboard {
                 localStorage.setItem('admin_token', this.token);
                 
                 this.showNotification('Login successful!', 'success');
+                await this.refreshCsrfToken();
                 this.showDashboard();
                 this.startSessionTimer();
             } else {
@@ -1778,6 +1785,11 @@ class AdminDashboard {
     }
 
     async apiCall(url, method = 'GET', data = null, isFormData = false) {
+        // Check rate limiting
+        if (!this.checkRateLimit(url)) {
+            throw new Error('Rate limit exceeded. Please wait before making more requests.');
+        }
+
         const options = {
             method,
             headers: {
@@ -1785,17 +1797,46 @@ class AdminDashboard {
             }
         };
 
+        // Add CSRF token for state-changing operations
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
+            if (!this.csrfToken) {
+                await this.refreshCsrfToken();
+            }
+
+            if (this.csrfToken) {
+                options.headers['X-CSRF-Token'] = this.csrfToken;
+            }
+        }
+
         if (data) {
             if (isFormData) {
                 options.body = data;
+                // Add CSRF token to FormData
+                if (this.csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
+                    data.append('_csrf', this.csrfToken);
+                }
                 // Don't set Content-Type for FormData, let browser set it with boundary
             } else {
                 options.headers['Content-Type'] = 'application/json';
+                // Add CSRF token to JSON data
+                if (this.csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
+                    data._csrf = this.csrfToken;
+                }
                 options.body = JSON.stringify(data);
             }
         }
 
         const response = await fetch(url, options);
+
+        // Handle CSRF token refresh
+        if (response.status === 403) {
+            const errorData = await response.json().catch(() => ({}));
+            if (errorData.error === 'Invalid CSRF token') {
+                await this.refreshCsrfToken();
+                // Retry the request once with new token
+                return this.apiCall(url, method, data, isFormData);
+            }
+        }
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ error: 'Network error' }));
@@ -1803,6 +1844,178 @@ class AdminDashboard {
         }
 
         return await response.json();
+    }
+
+    // CSRF Protection
+    async getCsrfToken() {
+        try {
+            const response = await fetch('/admin/api/csrf-token', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.csrfToken = data.token;
+                return this.csrfToken;
+            }
+        } catch (error) {
+            console.error('Error getting CSRF token:', error);
+        }
+        return null;
+    }
+
+    async refreshCsrfToken() {
+        this.csrfToken = await this.getCsrfToken();
+    }
+
+    // File Upload Security
+    validateFile(file, type = 'image') {
+        const errors = [];
+
+        // Check file size
+        if (file.size > this.maxFileSize) {
+            errors.push(`File size must be less than ${this.maxFileSize / (1024 * 1024)}MB`);
+        }
+
+        // Check file type
+        if (type === 'image' && !this.allowedImageTypes.includes(file.type)) {
+            errors.push('Only JPEG, PNG, GIF, and WebP images are allowed');
+        }
+
+        // Check file name for security
+        const fileName = file.name;
+        if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+            errors.push('File name contains invalid characters');
+        }
+
+        // Check for double extensions
+        if ((fileName.match(/\./g) || []).length > 1) {
+            errors.push('File name cannot contain multiple extensions');
+        }
+
+        return errors;
+    }
+
+    sanitizeFileName(fileName) {
+        // Remove any path traversal attempts
+        fileName = fileName.replace(/[\/\\]/g, '');
+
+        // Remove special characters except dots, hyphens, and underscores
+        fileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '');
+
+        // Limit length
+        if (fileName.length > 100) {
+            const ext = fileName.split('.').pop();
+            const name = fileName.substring(0, 100 - ext.length - 1);
+            fileName = `${name}.${ext}`;
+        }
+
+        return fileName;
+    }
+
+    // Enhanced file upload with security checks
+    setupFileUploadAreas(container) {
+        const uploadAreas = container.querySelectorAll('.file-upload-area');
+
+        uploadAreas.forEach(area => {
+            const input = area.querySelector('.file-input');
+            const display = area.querySelector('.file-upload-display');
+
+            // Click to upload
+            display.addEventListener('click', () => input.click());
+
+            // File selection with validation
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const errors = this.validateFile(file);
+                    if (errors.length > 0) {
+                        this.showNotification(`File validation failed: ${errors.join(', ')}`, 'error');
+                        input.value = ''; // Clear invalid file
+                        return;
+                    }
+                    this.previewFile(file, display);
+                }
+            });
+
+            // Drag and drop with validation
+            area.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                area.classList.add('drag-over');
+            });
+
+            area.addEventListener('dragleave', () => {
+                area.classList.remove('drag-over');
+            });
+
+            area.addEventListener('drop', (e) => {
+                e.preventDefault();
+                area.classList.remove('drag-over');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    const errors = this.validateFile(file);
+                    if (errors.length > 0) {
+                        this.showNotification(`File validation failed: ${errors.join(', ')}`, 'error');
+                        return;
+                    }
+
+                    // Create a new FileList with the validated file
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;
+
+                    this.previewFile(file, display);
+                }
+            });
+        });
+    }
+
+    // Rate limiting for API calls
+    initRateLimiting() {
+        this.apiCallCounts = new Map();
+        this.rateLimitWindow = 60000; // 1 minute
+        this.maxCallsPerWindow = 100;
+
+        // Clean up old entries every minute
+        setInterval(() => {
+            const now = Date.now();
+            for (const [key, data] of this.apiCallCounts.entries()) {
+                if (now - data.firstCall > this.rateLimitWindow) {
+                    this.apiCallCounts.delete(key);
+                }
+            }
+        }, this.rateLimitWindow);
+    }
+
+    checkRateLimit(endpoint) {
+        const now = Date.now();
+        const key = endpoint;
+
+        if (!this.apiCallCounts.has(key)) {
+            this.apiCallCounts.set(key, { count: 1, firstCall: now });
+            return true;
+        }
+
+        const data = this.apiCallCounts.get(key);
+
+        // Reset if window has passed
+        if (now - data.firstCall > this.rateLimitWindow) {
+            this.apiCallCounts.set(key, { count: 1, firstCall: now });
+            return true;
+        }
+
+        // Check if limit exceeded
+        if (data.count >= this.maxCallsPerWindow) {
+            return false;
+        }
+
+        // Increment count
+        data.count++;
+        return true;
     }
 
     // Session Management
@@ -2102,6 +2315,145 @@ class AdminDashboard {
         } catch (error) {
             resultsContainer.innerHTML = '<div class="search-error">Search failed. Please try again.</div>';
         }
+    }
+
+    // Security Monitoring
+    logSecurityEvent(event, details = {}) {
+        const securityLog = {
+            timestamp: new Date().toISOString(),
+            event: event,
+            details: details,
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            user: this.user?.email || 'anonymous'
+        };
+
+        // Send to server for logging (fire and forget)
+        fetch('/admin/api/security-log', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify(securityLog)
+        }).catch(() => {
+            // Silently fail - don't interrupt user experience
+        });
+
+        // Also log to console in development
+        if (window.location.hostname === 'localhost') {
+            console.log('Security Event:', securityLog);
+        }
+    }
+
+    // Enhanced error handling with security logging
+    handleSecurityError(error, context = '') {
+        this.logSecurityEvent('security_error', {
+            error: error.message,
+            context: context,
+            stack: error.stack
+        });
+
+        // Show user-friendly error message
+        this.showNotification('A security error occurred. Please try again.', 'error');
+    }
+
+    // Detect and prevent common attacks
+    detectSuspiciousActivity() {
+        // Monitor for rapid-fire requests
+        const now = Date.now();
+        if (!this.lastRequestTime) {
+            this.lastRequestTime = now;
+            this.requestCount = 1;
+            return false;
+        }
+
+        if (now - this.lastRequestTime < 100) { // Less than 100ms between requests
+            this.requestCount++;
+            if (this.requestCount > 10) {
+                this.logSecurityEvent('suspicious_activity', {
+                    type: 'rapid_requests',
+                    count: this.requestCount,
+                    timespan: now - this.lastRequestTime
+                });
+                return true;
+            }
+        } else {
+            this.requestCount = 1;
+        }
+
+        this.lastRequestTime = now;
+        return false;
+    }
+
+    // Content Security Policy violation handler
+    initCSPViolationHandler() {
+        document.addEventListener('securitypolicyviolation', (e) => {
+            this.logSecurityEvent('csp_violation', {
+                blockedURI: e.blockedURI,
+                violatedDirective: e.violatedDirective,
+                originalPolicy: e.originalPolicy,
+                sourceFile: e.sourceFile,
+                lineNumber: e.lineNumber
+            });
+        });
+    }
+
+    // Initialize security features
+    initSecurity() {
+        this.initCSPViolationHandler();
+
+        // Prevent right-click in production
+        if (window.location.hostname !== 'localhost') {
+            document.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.logSecurityEvent('context_menu_blocked');
+            });
+        }
+
+        // Detect developer tools
+        let devtools = {
+            open: false,
+            orientation: null
+        };
+
+        const threshold = 160;
+        setInterval(() => {
+            if (window.outerHeight - window.innerHeight > threshold ||
+                window.outerWidth - window.innerWidth > threshold) {
+                if (!devtools.open) {
+                    devtools.open = true;
+                    this.logSecurityEvent('devtools_opened');
+                }
+            } else {
+                devtools.open = false;
+            }
+        }, 500);
+
+        // Monitor for suspicious DOM modifications
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Check for suspicious script injections
+                            if (node.tagName === 'SCRIPT' && !node.src.includes(window.location.origin)) {
+                                this.logSecurityEvent('suspicious_script_injection', {
+                                    src: node.src,
+                                    innerHTML: node.innerHTML.substring(0, 100)
+                                });
+                                node.remove();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
 }
 
