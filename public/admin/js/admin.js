@@ -873,35 +873,850 @@ class AdminDashboard {
         }
     }
 
-    // Placeholder methods for other functionality
+    // Testimonials Management Methods
     async loadTestimonials() {
-        console.log('Loading testimonials...');
-        // Implementation will be added
-    }
+        try {
+            const response = await this.apiCall('/admin/api/testimonials');
+            const testimonials = response.testimonials || [];
 
-    async loadMessages() {
-        console.log('Loading messages...');
-        // Implementation will be added
-    }
+            const container = document.getElementById('testimonials-content');
+            if (!container) return;
 
-    async loadNewsletterSubscribers() {
-        console.log('Loading newsletter subscribers...');
-        // Implementation will be added
-    }
+            if (testimonials.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <h3>No testimonials found</h3>
+                        <p>Add your first testimonial to get started.</p>
+                        <button class="btn btn-primary" onclick="adminDashboard.showAddTestimonialModal()">Add Testimonial</button>
+                    </div>
+                `;
+                return;
+            }
 
-    async loadContent() {
-        console.log('Loading content...');
-        // Implementation will be added
-    }
-
-    async loadAnalytics() {
-        console.log('Loading analytics...');
-        // Implementation will be added
+            container.innerHTML = `
+                <div class="testimonials-grid">
+                    ${testimonials.map(testimonial => `
+                        <div class="testimonial-card">
+                            <div class="testimonial-header">
+                                <div class="testimonial-avatar">
+                                    ${testimonial.avatar_url ? `<img src="${testimonial.avatar_url}" alt="${testimonial.name}">` : '<div class="avatar-placeholder">👤</div>'}
+                                </div>
+                                <div class="testimonial-info">
+                                    <h4>${this.escapeHtml(testimonial.name)}</h4>
+                                    ${testimonial.title ? `<p class="testimonial-title">${this.escapeHtml(testimonial.title)}</p>` : ''}
+                                    <div class="testimonial-rating">
+                                        ${'★'.repeat(testimonial.rating || 5)}${'☆'.repeat(5 - (testimonial.rating || 5))}
+                                    </div>
+                                </div>
+                                <div class="testimonial-status">
+                                    <span class="status-badge status-${testimonial.status}">${testimonial.status}</span>
+                                </div>
+                            </div>
+                            <div class="testimonial-content">
+                                <p>"${this.escapeHtml(testimonial.content)}"</p>
+                            </div>
+                            <div class="testimonial-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="adminDashboard.editTestimonial(${testimonial.id})" title="Edit Testimonial">
+                                    <span class="btn-icon">✏️</span>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="adminDashboard.deleteTestimonial(${testimonial.id})" title="Delete Testimonial">
+                                    <span class="btn-icon">🗑️</span>
+                                </button>
+                            </div>
+                            <div class="testimonial-meta">
+                                <small>Created: ${new Date(testimonial.created_at).toLocaleDateString()}</small>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading testimonials:', error);
+            this.showNotification('Error loading testimonials', 'error');
+        }
     }
 
     showAddTestimonialModal() {
-        console.log('Show add testimonial modal');
-        // Implementation will be added
+        const modal = this.createModal('Add New Testimonial', this.getTestimonialFormHTML(), 'medium');
+        this.setupTestimonialForm(modal);
+    }
+
+    async editTestimonial(id) {
+        try {
+            const response = await this.apiCall(`/admin/api/testimonials/${id}`);
+            const testimonial = response.testimonial;
+
+            const modal = this.createModal('Edit Testimonial', this.getTestimonialFormHTML(testimonial), 'medium');
+            this.setupTestimonialForm(modal, testimonial);
+        } catch (error) {
+            console.error('Error loading testimonial:', error);
+            this.showNotification('Error loading testimonial', 'error');
+        }
+    }
+
+    async deleteTestimonial(id) {
+        if (!confirm('Are you sure you want to delete this testimonial? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/admin/api/testimonials/${id}`, 'DELETE');
+            this.showNotification('Testimonial deleted successfully', 'success');
+            this.loadTestimonials();
+        } catch (error) {
+            console.error('Error deleting testimonial:', error);
+            this.showNotification('Error deleting testimonial', 'error');
+        }
+    }
+
+    getTestimonialFormHTML(testimonial = null) {
+        const isEdit = testimonial !== null;
+        return `
+            <form id="testimonial-form" class="admin-form" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="testimonial-name">Name *</label>
+                        <input type="text" id="testimonial-name" name="name" value="${testimonial ? this.escapeHtml(testimonial.name) : ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="testimonial-title">Title/Position</label>
+                        <input type="text" id="testimonial-title" name="title" value="${testimonial ? this.escapeHtml(testimonial.title || '') : ''}" placeholder="e.g., CEO, Developer, Student">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="testimonial-content">Testimonial Content *</label>
+                    <textarea id="testimonial-content" name="content" rows="4" required placeholder="Share your experience...">${testimonial ? this.escapeHtml(testimonial.content) : ''}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="testimonial-rating">Rating</label>
+                        <select id="testimonial-rating" name="rating">
+                            <option value="5" ${testimonial && testimonial.rating === 5 ? 'selected' : ''}>5 Stars - Excellent</option>
+                            <option value="4" ${testimonial && testimonial.rating === 4 ? 'selected' : ''}>4 Stars - Very Good</option>
+                            <option value="3" ${testimonial && testimonial.rating === 3 ? 'selected' : ''}>3 Stars - Good</option>
+                            <option value="2" ${testimonial && testimonial.rating === 2 ? 'selected' : ''}>2 Stars - Fair</option>
+                            <option value="1" ${testimonial && testimonial.rating === 1 ? 'selected' : ''}>1 Star - Poor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="testimonial-status">Status</label>
+                        <select id="testimonial-status" name="status">
+                            <option value="active" ${testimonial && testimonial.status === 'active' ? 'selected' : ''}>Active</option>
+                            <option value="inactive" ${testimonial && testimonial.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="testimonial-avatar">Avatar Image</label>
+                    <div class="file-upload-area">
+                        <input type="file" id="testimonial-avatar" name="avatar" accept="image/*" class="file-input">
+                        <div class="file-upload-display">
+                            ${testimonial && testimonial.avatar_url ? `<img src="${testimonial.avatar_url}" alt="Current avatar" class="current-image">` : ''}
+                            <div class="file-upload-text">
+                                <span class="upload-icon">📁</span>
+                                <span>Choose avatar image or drag & drop</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">${isEdit ? 'Update' : 'Create'} Testimonial</span>
+                        <span class="btn-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        `;
+    }
+
+    setupTestimonialForm(modal, testimonial = null) {
+        const form = modal.querySelector('#testimonial-form');
+        const isEdit = testimonial !== null;
+
+        // Setup file upload areas
+        this.setupFileUploadAreas(form);
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+            // Show loading state
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'flex';
+            submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData(form);
+
+                const url = isEdit ? `/admin/api/testimonials/${testimonial.id}` : '/admin/api/testimonials';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                await this.apiCall(url, method, formData, true); // true for FormData
+
+                this.showNotification(`Testimonial ${isEdit ? 'updated' : 'created'} successfully`, 'success');
+                modal.remove();
+                this.loadTestimonials();
+
+            } catch (error) {
+                console.error('Error saving testimonial:', error);
+                this.showNotification(`Error ${isEdit ? 'updating' : 'creating'} testimonial`, 'error');
+            } finally {
+                // Reset loading state
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
+    // Messages Management Methods
+    async loadMessages() {
+        try {
+            const response = await this.apiCall('/admin/api/contact-messages');
+            const messages = response.messages || [];
+
+            const container = document.getElementById('messages-content');
+            if (!container) return;
+
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📧</div>
+                        <h3>No messages found</h3>
+                        <p>Contact messages will appear here when users submit the contact form.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="messages-list">
+                    ${messages.map(message => `
+                        <div class="message-card ${message.status === 'unread' ? 'unread' : ''}">
+                            <div class="message-header">
+                                <div class="message-info">
+                                    <h4>${this.escapeHtml(message.name)}</h4>
+                                    <p class="message-email">${this.escapeHtml(message.email)}</p>
+                                    ${message.subject ? `<p class="message-subject">${this.escapeHtml(message.subject)}</p>` : ''}
+                                </div>
+                                <div class="message-meta">
+                                    <span class="status-badge status-${message.status}">${message.status}</span>
+                                    <small class="message-date">${new Date(message.created_at).toLocaleString()}</small>
+                                </div>
+                            </div>
+                            <div class="message-content">
+                                <p>${this.escapeHtml(message.message)}</p>
+                            </div>
+                            <div class="message-actions">
+                                ${message.status === 'unread' ? `
+                                    <button class="btn btn-sm btn-primary" onclick="adminDashboard.markMessageRead(${message.id})">Mark as Read</button>
+                                ` : ''}
+                                <button class="btn btn-sm btn-danger" onclick="adminDashboard.deleteMessage(${message.id})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            this.showNotification('Error loading messages', 'error');
+        }
+    }
+
+    async markMessageRead(id) {
+        try {
+            await this.apiCall(`/admin/api/contact-messages/${id}`, 'PUT', { status: 'read' });
+            this.showNotification('Message marked as read', 'success');
+            this.loadMessages();
+            this.loadDashboardStats(); // Update unread count
+        } catch (error) {
+            console.error('Error marking message as read:', error);
+            this.showNotification('Error updating message', 'error');
+        }
+    }
+
+    async deleteMessage(id) {
+        if (!confirm('Are you sure you want to delete this message? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/admin/api/contact-messages/${id}`, 'DELETE');
+            this.showNotification('Message deleted successfully', 'success');
+            this.loadMessages();
+            this.loadDashboardStats(); // Update counts
+        } catch (error) {
+            console.error('Error deleting message:', error);
+            this.showNotification('Error deleting message', 'error');
+        }
+    }
+
+    async loadNewsletterSubscribers() {
+        try {
+            const response = await this.apiCall('/admin/api/newsletter-subscribers');
+            const subscribers = response.subscribers || [];
+
+            const container = document.getElementById('newsletter-content');
+            if (!container) return;
+
+            if (subscribers.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📬</div>
+                        <h3>No subscribers found</h3>
+                        <p>Newsletter subscribers will appear here when users sign up.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="subscribers-list">
+                    <div class="subscribers-header">
+                        <h3>Newsletter Subscribers (${subscribers.length})</h3>
+                        <div class="subscribers-actions">
+                            <button class="btn btn-primary btn-sm" onclick="adminDashboard.exportSubscribers()">
+                                <span class="btn-icon">📥</span>
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Subscribed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${subscribers.map(subscriber => `
+                                    <tr>
+                                        <td>${this.escapeHtml(subscriber.email)}</td>
+                                        <td><span class="status-badge status-${subscriber.status}">${subscriber.status}</span></td>
+                                        <td>${new Date(subscriber.created_at).toLocaleDateString()}</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                ${subscriber.status === 'active' ? `
+                                                    <button class="btn btn-sm btn-warning" onclick="adminDashboard.unsubscribeUser(${subscriber.id})" title="Unsubscribe">
+                                                        <span class="btn-icon">🚫</span>
+                                                    </button>
+                                                ` : `
+                                                    <button class="btn btn-sm btn-success" onclick="adminDashboard.resubscribeUser(${subscriber.id})" title="Resubscribe">
+                                                        <span class="btn-icon">✅</span>
+                                                    </button>
+                                                `}
+                                                <button class="btn btn-sm btn-danger" onclick="adminDashboard.deleteSubscriber(${subscriber.id})" title="Delete">
+                                                    <span class="btn-icon">🗑️</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading newsletter subscribers:', error);
+            this.showNotification('Error loading subscribers', 'error');
+        }
+    }
+
+    async unsubscribeUser(id) {
+        try {
+            await this.apiCall(`/admin/api/newsletter-subscribers/${id}`, 'PUT', { status: 'inactive' });
+            this.showNotification('User unsubscribed', 'success');
+            this.loadNewsletterSubscribers();
+        } catch (error) {
+            console.error('Error unsubscribing user:', error);
+            this.showNotification('Error updating subscription', 'error');
+        }
+    }
+
+    async resubscribeUser(id) {
+        try {
+            await this.apiCall(`/admin/api/newsletter-subscribers/${id}`, 'PUT', { status: 'active' });
+            this.showNotification('User resubscribed', 'success');
+            this.loadNewsletterSubscribers();
+        } catch (error) {
+            console.error('Error resubscribing user:', error);
+            this.showNotification('Error updating subscription', 'error');
+        }
+    }
+
+    async deleteSubscriber(id) {
+        if (!confirm('Are you sure you want to delete this subscriber? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/admin/api/newsletter-subscribers/${id}`, 'DELETE');
+            this.showNotification('Subscriber deleted successfully', 'success');
+            this.loadNewsletterSubscribers();
+        } catch (error) {
+            console.error('Error deleting subscriber:', error);
+            this.showNotification('Error deleting subscriber', 'error');
+        }
+    }
+
+    exportSubscribers() {
+        // Simple CSV export functionality
+        this.apiCall('/admin/api/newsletter-subscribers')
+            .then(response => {
+                const subscribers = response.subscribers || [];
+                const csvContent = [
+                    'Email,Status,Subscribed Date',
+                    ...subscribers.map(sub =>
+                        `${sub.email},${sub.status},${new Date(sub.created_at).toLocaleDateString()}`
+                    )
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `newsletter-subscribers-${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                this.showNotification('Subscribers exported successfully', 'success');
+            })
+            .catch(error => {
+                console.error('Error exporting subscribers:', error);
+                this.showNotification('Error exporting subscribers', 'error');
+            });
+    }
+
+    async loadContent() {
+        try {
+            const response = await this.apiCall('/admin/api/site-content');
+            const content = response.content || [];
+
+            const container = document.getElementById('content-content');
+            if (!container) return;
+
+            const contentSections = [
+                { key: 'hero', title: 'Hero Section', description: 'Main banner and call-to-action' },
+                { key: 'about', title: 'About Section', description: 'Information about the platform' },
+                { key: 'features', title: 'Features Section', description: 'Key features and benefits' },
+                { key: 'stats', title: 'Statistics Section', description: 'Platform statistics and metrics' },
+                { key: 'footer', title: 'Footer Content', description: 'Footer links and information' },
+                { key: 'contact', title: 'Contact Information', description: 'Contact details and form' }
+            ];
+
+            container.innerHTML = `
+                <div class="content-sections">
+                    ${contentSections.map(section => {
+                        const sectionContent = content.find(c => c.section === section.key);
+                        return `
+                            <div class="content-section-card">
+                                <div class="content-section-header">
+                                    <div class="content-section-info">
+                                        <h3>${section.title}</h3>
+                                        <p>${section.description}</p>
+                                    </div>
+                                    <div class="content-section-actions">
+                                        <button class="btn btn-primary btn-sm" onclick="adminDashboard.editContentSection('${section.key}', '${section.title}')">
+                                            <span class="btn-icon">✏️</span>
+                                            Edit
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="content-section-preview">
+                                    ${sectionContent ? `
+                                        <div class="content-preview">
+                                            <small class="content-meta">Last updated: ${new Date(sectionContent.updated_at).toLocaleDateString()}</small>
+                                            <div class="content-snippet">
+                                                ${this.getContentPreview(sectionContent.content)}
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div class="content-empty">
+                                            <span class="empty-icon">📝</span>
+                                            <span>No content configured</span>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading content:', error);
+            this.showNotification('Error loading content', 'error');
+        }
+    }
+
+    async editContentSection(sectionKey, sectionTitle) {
+        try {
+            const response = await this.apiCall(`/admin/api/site-content/${sectionKey}`);
+            const content = response.content;
+
+            const modal = this.createModal(`Edit ${sectionTitle}`, this.getContentFormHTML(sectionKey, sectionTitle, content), 'large');
+            this.setupContentForm(modal, sectionKey);
+        } catch (error) {
+            // If content doesn't exist, create new
+            const modal = this.createModal(`Edit ${sectionTitle}`, this.getContentFormHTML(sectionKey, sectionTitle), 'large');
+            this.setupContentForm(modal, sectionKey);
+        }
+    }
+
+    getContentPreview(content) {
+        if (!content) return 'No content';
+
+        try {
+            const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+
+            if (parsed.title) {
+                return `<strong>${this.escapeHtml(parsed.title)}</strong>`;
+            } else if (parsed.heading) {
+                return `<strong>${this.escapeHtml(parsed.heading)}</strong>`;
+            } else if (parsed.text) {
+                return this.escapeHtml(parsed.text.substring(0, 100) + (parsed.text.length > 100 ? '...' : ''));
+            } else {
+                return 'Content configured';
+            }
+        } catch (e) {
+            return 'Content configured';
+        }
+    }
+
+    getContentFormHTML(sectionKey, sectionTitle, content = null) {
+        const contentData = content ? (typeof content.content === 'string' ? JSON.parse(content.content) : content.content) : {};
+
+        // Define different form templates based on section type
+        const formTemplates = {
+            hero: `
+                <div class="form-group">
+                    <label for="content-title">Main Title *</label>
+                    <input type="text" id="content-title" name="title" value="${contentData.title || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="content-subtitle">Subtitle</label>
+                    <input type="text" id="content-subtitle" name="subtitle" value="${contentData.subtitle || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="content-description">Description</label>
+                    <textarea id="content-description" name="description" rows="3">${contentData.description || ''}</textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="content-cta-text">Call-to-Action Text</label>
+                        <input type="text" id="content-cta-text" name="ctaText" value="${contentData.ctaText || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="content-cta-url">Call-to-Action URL</label>
+                        <input type="url" id="content-cta-url" name="ctaUrl" value="${contentData.ctaUrl || ''}">
+                    </div>
+                </div>
+            `,
+            about: `
+                <div class="form-group">
+                    <label for="content-heading">Section Heading *</label>
+                    <input type="text" id="content-heading" name="heading" value="${contentData.heading || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="content-text">Content Text *</label>
+                    <textarea id="content-text" name="text" rows="6" required>${contentData.text || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="content-image">Image URL</label>
+                    <input type="url" id="content-image" name="imageUrl" value="${contentData.imageUrl || ''}">
+                </div>
+            `,
+            features: `
+                <div class="form-group">
+                    <label for="content-heading">Section Heading *</label>
+                    <input type="text" id="content-heading" name="heading" value="${contentData.heading || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="content-subtitle">Subtitle</label>
+                    <input type="text" id="content-subtitle" name="subtitle" value="${contentData.subtitle || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="content-features">Features (JSON format)</label>
+                    <textarea id="content-features" name="features" rows="8" placeholder='[{"icon": "🚀", "title": "Feature 1", "description": "Description"}]'>${JSON.stringify(contentData.features || [], null, 2)}</textarea>
+                    <small class="form-help">Enter features as JSON array with icon, title, and description fields.</small>
+                </div>
+            `,
+            contact: `
+                <div class="form-group">
+                    <label for="content-heading">Section Heading *</label>
+                    <input type="text" id="content-heading" name="heading" value="${contentData.heading || ''}" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="content-email">Email Address</label>
+                        <input type="email" id="content-email" name="email" value="${contentData.email || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="content-phone">Phone Number</label>
+                        <input type="tel" id="content-phone" name="phone" value="${contentData.phone || ''}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="content-address">Address</label>
+                    <textarea id="content-address" name="address" rows="3">${contentData.address || ''}</textarea>
+                </div>
+            `
+        };
+
+        const defaultTemplate = `
+            <div class="form-group">
+                <label for="content-data">Content Data (JSON format)</label>
+                <textarea id="content-data" name="contentData" rows="10" placeholder='{"key": "value"}'>${JSON.stringify(contentData, null, 2)}</textarea>
+                <small class="form-help">Enter content as JSON object.</small>
+            </div>
+        `;
+
+        return `
+            <form id="content-form" class="admin-form">
+                <div class="form-section">
+                    <h4>Edit ${sectionTitle}</h4>
+                    <p class="form-description">Configure the content for this section of your website.</p>
+                </div>
+
+                ${formTemplates[sectionKey] || defaultTemplate}
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">Save Content</span>
+                        <span class="btn-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        `;
+    }
+
+    setupContentForm(modal, sectionKey) {
+        const form = modal.querySelector('#content-form');
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+            // Show loading state
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'flex';
+            submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData(form);
+                const contentData = {};
+
+                // Build content object from form data
+                for (const [key, value] of formData.entries()) {
+                    if (key === 'features' || key === 'contentData') {
+                        try {
+                            contentData[key === 'contentData' ? 'data' : key] = JSON.parse(value);
+                        } catch (e) {
+                            contentData[key === 'contentData' ? 'data' : key] = value;
+                        }
+                    } else {
+                        contentData[key] = value;
+                    }
+                }
+
+                const payload = {
+                    section: sectionKey,
+                    content: contentData
+                };
+
+                await this.apiCall('/admin/api/site-content', 'POST', payload);
+
+                this.showNotification('Content updated successfully', 'success');
+                modal.remove();
+                this.loadContent();
+
+            } catch (error) {
+                console.error('Error saving content:', error);
+                this.showNotification('Error saving content', 'error');
+            } finally {
+                // Reset loading state
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
+    async loadAnalytics() {
+        try {
+            const [analyticsResponse, appsResponse] = await Promise.all([
+                this.apiCall('/admin/api/analytics?days=30'),
+                this.apiCall('/admin/api/applications')
+            ]);
+
+            const analytics = analyticsResponse.analytics || [];
+            const applications = appsResponse.applications || [];
+
+            const container = document.getElementById('analytics-content');
+            if (!container) return;
+
+            // Process analytics data
+            const eventCounts = {};
+            const dailyStats = {};
+
+            analytics.forEach(event => {
+                eventCounts[event.event_type] = (eventCounts[event.event_type] || 0) + 1;
+
+                const date = new Date(event.created_at).toDateString();
+                if (!dailyStats[date]) {
+                    dailyStats[date] = { launches: 0, installs: 0, views: 0 };
+                }
+                dailyStats[date][event.event_type === 'app_launch' ? 'launches' :
+                                event.event_type === 'app_install' ? 'installs' : 'views']++;
+            });
+
+            // Get top applications
+            const topApps = applications
+                .sort((a, b) => (b.launch_count || 0) - (a.launch_count || 0))
+                .slice(0, 5);
+
+            container.innerHTML = `
+                <div class="analytics-dashboard">
+                    <div class="analytics-summary">
+                        <div class="summary-card">
+                            <div class="summary-icon">📊</div>
+                            <div class="summary-content">
+                                <div class="summary-number">${analytics.length}</div>
+                                <div class="summary-label">Total Events (30 days)</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">🚀</div>
+                            <div class="summary-content">
+                                <div class="summary-number">${eventCounts.app_launch || 0}</div>
+                                <div class="summary-label">App Launches</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">📥</div>
+                            <div class="summary-content">
+                                <div class="summary-number">${eventCounts.app_install || 0}</div>
+                                <div class="summary-label">App Installs</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">👁️</div>
+                            <div class="summary-content">
+                                <div class="summary-number">${eventCounts.page_view || 0}</div>
+                                <div class="summary-label">Page Views</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-charts">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3>Top Applications</h3>
+                                <p>Most launched applications</p>
+                            </div>
+                            <div class="chart-content">
+                                ${topApps.length > 0 ? `
+                                    <div class="top-apps-list">
+                                        ${topApps.map((app, index) => `
+                                            <div class="top-app-item">
+                                                <div class="app-rank">#${index + 1}</div>
+                                                <div class="app-info">
+                                                    <div class="app-name">${this.escapeHtml(app.name)}</div>
+                                                    <div class="app-category">${this.escapeHtml(app.category)}</div>
+                                                </div>
+                                                <div class="app-stats">
+                                                    <div class="stat-value">${app.launch_count || 0}</div>
+                                                    <div class="stat-label">launches</div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : '<div class="no-data">No application data available</div>'}
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3>Event Types</h3>
+                                <p>Distribution of events</p>
+                            </div>
+                            <div class="chart-content">
+                                ${Object.keys(eventCounts).length > 0 ? `
+                                    <div class="event-types-list">
+                                        ${Object.entries(eventCounts).map(([type, count]) => `
+                                            <div class="event-type-item">
+                                                <div class="event-type-name">${type.replace('_', ' ').toUpperCase()}</div>
+                                                <div class="event-type-count">${count}</div>
+                                                <div class="event-type-bar">
+                                                    <div class="event-type-fill" style="width: ${(count / Math.max(...Object.values(eventCounts))) * 100}%"></div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : '<div class="no-data">No event data available</div>'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-details">
+                        <div class="details-card">
+                            <div class="details-header">
+                                <h3>Recent Activity</h3>
+                                <p>Latest events from the past 30 days</p>
+                            </div>
+                            <div class="details-content">
+                                ${analytics.length > 0 ? `
+                                    <div class="activity-timeline">
+                                        ${analytics.slice(0, 10).map(event => `
+                                            <div class="activity-item">
+                                                <div class="activity-icon">
+                                                    ${event.event_type === 'app_launch' ? '🚀' :
+                                                      event.event_type === 'app_install' ? '📥' : '👁️'}
+                                                </div>
+                                                <div class="activity-content">
+                                                    <div class="activity-text">
+                                                        ${event.event_type.replace('_', ' ').toUpperCase()}
+                                                        ${event.metadata ? ` - ${JSON.parse(event.metadata).app_name || 'Unknown'}` : ''}
+                                                    </div>
+                                                    <div class="activity-time">${new Date(event.created_at).toLocaleString()}</div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : '<div class="no-data">No recent activity</div>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading analytics:', error);
+            this.showNotification('Error loading analytics', 'error');
+        }
     }
 
     // Utility Methods
