@@ -10,7 +10,7 @@ class Database {
 
         // Database path configuration
         this.dbName = process.env.DATABASE_NAME || 'webapps_hub.db';
-        this.dbPath = this.getDatabasePath();
+        this._dbPath = null; // Lazy initialization
 
         // Performance and configuration settings
         this.config = {
@@ -37,6 +37,14 @@ class Database {
             totalQueryTime: 0,
             slowQueries: 0
         };
+    }
+
+    // Lazy getter for database path
+    get dbPath() {
+        if (!this._dbPath) {
+            this._dbPath = this.getDatabasePath();
+        }
+        return this._dbPath;
     }
 
     getDatabasePath() {
