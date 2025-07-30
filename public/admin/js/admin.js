@@ -471,12 +471,409 @@ class AdminDashboard {
         }, 3000);
     }
 
-    // Placeholder methods for other functionality
+    // Application Management Methods
     async loadApplications() {
-        console.log('Loading applications...');
-        // Implementation will be added
+        try {
+            const response = await this.apiCall('/admin/api/applications');
+            const applications = response.applications || [];
+
+            const tbody = document.getElementById('applications-tbody');
+            if (!tbody) return;
+
+            if (applications.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">No applications found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = applications.map(app => `
+                <tr>
+                    <td>
+                        <div class="app-info">
+                            ${app.logo_url ? `<img src="${app.logo_url}" alt="${app.name}" class="app-logo">` : '<div class="app-logo-placeholder">📱</div>'}
+                            <div class="app-details">
+                                <div class="app-name">${this.escapeHtml(app.name)}</div>
+                                <div class="app-short-name">${this.escapeHtml(app.short_name)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="category-badge">${this.escapeHtml(app.category)}</span></td>
+                    <td><span class="status-badge status-${app.status}">${app.status}</span></td>
+                    <td>${app.launch_count || 0}</td>
+                    <td>${app.install_count || 0}</td>
+                    <td>${new Date(app.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-secondary" onclick="adminDashboard.editApplication(${app.id})" title="Edit Application">
+                                <span class="btn-icon">✏️</span>
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="adminDashboard.viewApplication(${app.id})" title="View Details">
+                                <span class="btn-icon">👁️</span>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="adminDashboard.deleteApplication(${app.id})" title="Delete Application">
+                                <span class="btn-icon">🗑️</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading applications:', error);
+            this.showNotification('Error loading applications', 'error');
+        }
     }
 
+    showAddApplicationModal() {
+        const modal = this.createModal('Add New Application', this.getApplicationFormHTML(), 'large');
+        this.setupApplicationForm(modal);
+    }
+
+    async editApplication(id) {
+        try {
+            const response = await this.apiCall(`/admin/api/applications/${id}`);
+            const app = response.application;
+
+            const modal = this.createModal('Edit Application', this.getApplicationFormHTML(app), 'large');
+            this.setupApplicationForm(modal, app);
+        } catch (error) {
+            console.error('Error loading application:', error);
+            this.showNotification('Error loading application', 'error');
+        }
+    }
+
+    async viewApplication(id) {
+        try {
+            const response = await this.apiCall(`/admin/api/applications/${id}`);
+            const app = response.application;
+
+            const modal = this.createModal('Application Details', this.getApplicationViewHTML(app), 'large');
+        } catch (error) {
+            console.error('Error loading application:', error);
+            this.showNotification('Error loading application', 'error');
+        }
+    }
+
+    async deleteApplication(id) {
+        if (!confirm('Are you sure you want to delete this application? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/admin/api/applications/${id}`, 'DELETE');
+            this.showNotification('Application deleted successfully', 'success');
+            this.loadApplications();
+        } catch (error) {
+            console.error('Error deleting application:', error);
+            this.showNotification('Error deleting application', 'error');
+        }
+    }
+
+    getApplicationFormHTML(app = null) {
+        const isEdit = app !== null;
+        return `
+            <form id="application-form" class="admin-form" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="app-name">Application Name *</label>
+                        <input type="text" id="app-name" name="name" value="${app ? this.escapeHtml(app.name) : ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-short-name">Short Name *</label>
+                        <input type="text" id="app-short-name" name="short_name" value="${app ? this.escapeHtml(app.short_name) : ''}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="app-category">Category *</label>
+                        <select id="app-category" name="category" required>
+                            <option value="">Select Category</option>
+                            <option value="productivity" ${app && app.category === 'productivity' ? 'selected' : ''}>Productivity</option>
+                            <option value="creative" ${app && app.category === 'creative' ? 'selected' : ''}>Creative</option>
+                            <option value="finance" ${app && app.category === 'finance' ? 'selected' : ''}>Finance</option>
+                            <option value="utility" ${app && app.category === 'utility' ? 'selected' : ''}>Utility</option>
+                            <option value="entertainment" ${app && app.category === 'entertainment' ? 'selected' : ''}>Entertainment</option>
+                            <option value="education" ${app && app.category === 'education' ? 'selected' : ''}>Education</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-status">Status</label>
+                        <select id="app-status" name="status">
+                            <option value="active" ${app && app.status === 'active' ? 'selected' : ''}>Active</option>
+                            <option value="inactive" ${app && app.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="app-description">Short Description *</label>
+                    <textarea id="app-description" name="description" rows="3" required>${app ? this.escapeHtml(app.description) : ''}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="app-long-description">Long Description</label>
+                    <textarea id="app-long-description" name="long_description" rows="6">${app ? this.escapeHtml(app.long_description || '') : ''}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="app-url">Application URL *</label>
+                        <input type="url" id="app-url" name="app_url" value="${app ? this.escapeHtml(app.app_url) : ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-install-url">Install URL</label>
+                        <input type="url" id="app-install-url" name="install_url" value="${app ? this.escapeHtml(app.install_url || '') : ''}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="app-tags">Tags (comma-separated)</label>
+                    <input type="text" id="app-tags" name="tags" value="${app ? this.escapeHtml(app.tags || '') : ''}" placeholder="e.g., productivity, task-management, collaboration">
+                </div>
+
+                <div class="form-group">
+                    <label for="app-features">Features (one per line)</label>
+                    <textarea id="app-features" name="features" rows="4" placeholder="Feature 1&#10;Feature 2&#10;Feature 3">${app ? this.escapeHtml(app.features || '') : ''}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="app-logo">Logo Image</label>
+                        <div class="file-upload-area">
+                            <input type="file" id="app-logo" name="logo" accept="image/*" class="file-input">
+                            <div class="file-upload-display">
+                                ${app && app.logo_url ? `<img src="${app.logo_url}" alt="Current logo" class="current-image">` : ''}
+                                <div class="file-upload-text">
+                                    <span class="upload-icon">📁</span>
+                                    <span>Choose logo image or drag & drop</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-screenshot">Screenshot</label>
+                        <div class="file-upload-area">
+                            <input type="file" id="app-screenshot" name="screenshot" accept="image/*" class="file-input">
+                            <div class="file-upload-display">
+                                ${app && app.screenshot_url ? `<img src="${app.screenshot_url}" alt="Current screenshot" class="current-image">` : ''}
+                                <div class="file-upload-text">
+                                    <span class="upload-icon">📁</span>
+                                    <span>Choose screenshot or drag & drop</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">${isEdit ? 'Update' : 'Create'} Application</span>
+                        <span class="btn-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        `;
+    }
+
+    getApplicationViewHTML(app) {
+        return `
+            <div class="app-view">
+                <div class="app-header">
+                    <div class="app-logo-large">
+                        ${app.logo_url ? `<img src="${app.logo_url}" alt="${app.name}">` : '<div class="app-logo-placeholder">📱</div>'}
+                    </div>
+                    <div class="app-info">
+                        <h2>${this.escapeHtml(app.name)}</h2>
+                        <p class="app-short-name">${this.escapeHtml(app.short_name)}</p>
+                        <div class="app-badges">
+                            <span class="category-badge">${this.escapeHtml(app.category)}</span>
+                            <span class="status-badge status-${app.status}">${app.status}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="app-details">
+                    <div class="detail-section">
+                        <h3>Description</h3>
+                        <p>${this.escapeHtml(app.description)}</p>
+                        ${app.long_description ? `<p>${this.escapeHtml(app.long_description)}</p>` : ''}
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>URLs</h3>
+                        <p><strong>App URL:</strong> <a href="${app.app_url}" target="_blank">${this.escapeHtml(app.app_url)}</a></p>
+                        ${app.install_url ? `<p><strong>Install URL:</strong> <a href="${app.install_url}" target="_blank">${this.escapeHtml(app.install_url)}</a></p>` : ''}
+                    </div>
+
+                    ${app.tags ? `
+                        <div class="detail-section">
+                            <h3>Tags</h3>
+                            <div class="tags">
+                                ${app.tags.split(',').map(tag => `<span class="tag">${this.escapeHtml(tag.trim())}</span>`).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${app.features ? `
+                        <div class="detail-section">
+                            <h3>Features</h3>
+                            <ul class="features-list">
+                                ${app.features.split('\n').filter(f => f.trim()).map(feature => `<li>${this.escapeHtml(feature.trim())}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <div class="detail-section">
+                        <h3>Statistics</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-label">Launches</span>
+                                <span class="stat-value">${app.launch_count || 0}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Installs</span>
+                                <span class="stat-value">${app.install_count || 0}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Rating</span>
+                                <span class="stat-value">${app.rating || 0}/5</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Reviews</span>
+                                <span class="stat-value">${app.rating_count || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${app.screenshot_url ? `
+                        <div class="detail-section">
+                            <h3>Screenshot</h3>
+                            <img src="${app.screenshot_url}" alt="${app.name} screenshot" class="app-screenshot">
+                        </div>
+                    ` : ''}
+
+                    <div class="detail-section">
+                        <h3>Metadata</h3>
+                        <p><strong>Created:</strong> ${new Date(app.created_at).toLocaleString()}</p>
+                        <p><strong>Updated:</strong> ${new Date(app.updated_at).toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div class="app-actions">
+                    <button class="btn btn-primary" onclick="adminDashboard.editApplication(${app.id})">Edit Application</button>
+                    <button class="btn btn-danger" onclick="adminDashboard.deleteApplication(${app.id})">Delete Application</button>
+                </div>
+            </div>
+        `;
+    }
+
+    setupApplicationForm(modal, app = null) {
+        const form = modal.querySelector('#application-form');
+        const isEdit = app !== null;
+
+        // Setup file upload areas
+        this.setupFileUploadAreas(form);
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+            // Show loading state
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'flex';
+            submitBtn.disabled = true;
+
+            try {
+                const formData = new FormData(form);
+
+                const url = isEdit ? `/admin/api/applications/${app.id}` : '/admin/api/applications';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                await this.apiCall(url, method, formData, true); // true for FormData
+
+                this.showNotification(`Application ${isEdit ? 'updated' : 'created'} successfully`, 'success');
+                modal.remove();
+                this.loadApplications();
+
+            } catch (error) {
+                console.error('Error saving application:', error);
+                this.showNotification(`Error ${isEdit ? 'updating' : 'creating'} application`, 'error');
+            } finally {
+                // Reset loading state
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    }
+
+    setupFileUploadAreas(container) {
+        const uploadAreas = container.querySelectorAll('.file-upload-area');
+
+        uploadAreas.forEach(area => {
+            const input = area.querySelector('.file-input');
+            const display = area.querySelector('.file-upload-display');
+
+            // Click to upload
+            display.addEventListener('click', () => input.click());
+
+            // File selection
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    this.previewFile(file, display);
+                }
+            });
+
+            // Drag and drop
+            area.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                area.classList.add('drag-over');
+            });
+
+            area.addEventListener('dragleave', () => {
+                area.classList.remove('drag-over');
+            });
+
+            area.addEventListener('drop', (e) => {
+                e.preventDefault();
+                area.classList.remove('drag-over');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    input.files = files;
+                    this.previewFile(files[0], display);
+                }
+            });
+        });
+    }
+
+    previewFile(file, display) {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const existingImage = display.querySelector('.current-image');
+                if (existingImage) {
+                    existingImage.src = e.target.result;
+                } else {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'current-image';
+                    img.alt = 'Preview';
+                    display.insertBefore(img, display.querySelector('.file-upload-text'));
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Placeholder methods for other functionality
     async loadTestimonials() {
         console.log('Loading testimonials...');
         // Implementation will be added
@@ -502,14 +899,71 @@ class AdminDashboard {
         // Implementation will be added
     }
 
-    showAddApplicationModal() {
-        console.log('Show add application modal');
-        // Implementation will be added
-    }
-
     showAddTestimonialModal() {
         console.log('Show add testimonial modal');
         // Implementation will be added
+    }
+
+    // Utility Methods
+    createModal(title, content, size = 'medium') {
+        const modal = document.createElement('div');
+        modal.className = `modal modal-${size}`;
+        modal.innerHTML = `
+            <div class="modal-overlay" onclick="this.closest('.modal').remove()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">${this.escapeHtml(title)}</h2>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    ${content}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Animate in
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+
+        return modal;
+    }
+
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async apiCall(url, method = 'GET', data = null, isFormData = false) {
+        const options = {
+            method,
+            headers: {
+                'Authorization': `Bearer ${this.token}`
+            }
+        };
+
+        if (data) {
+            if (isFormData) {
+                options.body = data;
+                // Don't set Content-Type for FormData, let browser set it with boundary
+            } else {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify(data);
+            }
+        }
+
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Network error' }));
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+
+        return await response.json();
     }
 }
 
