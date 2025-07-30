@@ -52,6 +52,8 @@ class Database {
         console.log('getDatabasePath - NODE_ENV:', process.env.NODE_ENV);
         console.log('getDatabasePath - DATABASE_PATH:', process.env.DATABASE_PATH);
         console.log('getDatabasePath - dbName:', this.dbName);
+        console.log('getDatabasePath - cwd:', process.cwd());
+        console.log('getDatabasePath - platform:', process.platform);
 
         // Use explicit DATABASE_PATH if provided
         if (process.env.DATABASE_PATH) {
@@ -59,12 +61,20 @@ class Database {
             return process.env.DATABASE_PATH;
         }
 
-        // Auto-configure based on environment
-        const path = process.env.NODE_ENV === 'production'
+        // Force production path for serverless environments
+        // Check if we're in a serverless environment (Netlify, Vercel, etc.)
+        const isServerless = process.env.NODE_ENV === 'production' ||
+                            process.env.NETLIFY ||
+                            process.env.VERCEL ||
+                            process.cwd().includes('/tmp') ||
+                            process.cwd().includes('lambda');
+
+        const path = isServerless
             ? `/tmp/${this.dbName}`
             : `./database/${this.dbName}`;
 
         console.log('Auto-configured database path:', path);
+        console.log('Is serverless environment:', isServerless);
         return path;
     }
 
