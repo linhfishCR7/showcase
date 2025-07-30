@@ -182,19 +182,23 @@ app.get('/api/debug', (req, res) => {
     const fs = require('fs');
     const diagnostics = {
         timestamp: new Date().toISOString(),
-        version: '2.0', // To verify deployment
+        version: '3.0', // To verify deployment
         environment: {
             NODE_ENV: process.env.NODE_ENV,
+            DATABASE_PATH: process.env.DATABASE_PATH,
+            NETLIFY: process.env.NETLIFY,
             hasJWT_SECRET: !!process.env.JWT_SECRET,
             hasADMIN_EMAIL: !!process.env.ADMIN_EMAIL,
             hasADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
             ADMIN_EMAIL: process.env.ADMIN_EMAIL, // Safe to show
             platform: process.platform,
             arch: process.arch,
-            nodeVersion: process.version
+            nodeVersion: process.version,
+            cwd: process.cwd()
         },
         filesystem: {},
-        sqlite3: {}
+        sqlite3: {},
+        databasePath: {}
     };
 
     // Test /tmp directory
@@ -230,6 +234,20 @@ app.get('/api/debug', (req, res) => {
         diagnostics.sqlite3 = {
             available: false,
             error: sqliteError.message
+        };
+    }
+
+    // Test database path calculation
+    try {
+        const Database = require('../../config/database');
+        diagnostics.databasePath = {
+            dbPath: Database.dbPath,
+            dbName: Database.dbName,
+            getDatabasePath: Database.getDatabasePath()
+        };
+    } catch (dbPathError) {
+        diagnostics.databasePath = {
+            error: dbPathError.message
         };
     }
 
