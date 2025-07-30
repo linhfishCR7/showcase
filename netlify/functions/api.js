@@ -61,12 +61,53 @@ let dbInitializationError = null;
 async function initializeDatabase() {
     if (!dbInitialized && !dbInitializationError) {
         try {
-            console.log('Initializing database...');
+            console.log('=== DATABASE INITIALIZATION DEBUG ===');
             console.log('NODE_ENV:', process.env.NODE_ENV);
-            console.log('Database path will be:', process.env.NODE_ENV === 'production' ? '/tmp/webapps_hub.db' : './database/webapps_hub.db');
+            console.log('Process platform:', process.platform);
+            console.log('Process arch:', process.arch);
 
+            // Check /tmp directory
+            const fs = require('fs');
+            const path = require('path');
+
+            try {
+                const tmpStats = fs.statSync('/tmp');
+                console.log('/tmp directory exists:', tmpStats.isDirectory());
+                console.log('/tmp permissions:', tmpStats.mode.toString(8));
+            } catch (tmpError) {
+                console.error('/tmp directory error:', tmpError.message);
+            }
+
+            // Check if we can write to /tmp
+            const testFile = '/tmp/test-write.txt';
+            try {
+                fs.writeFileSync(testFile, 'test');
+                fs.unlinkSync(testFile);
+                console.log('/tmp directory is writable: YES');
+            } catch (writeError) {
+                console.error('/tmp directory is writable: NO -', writeError.message);
+            }
+
+            // Check sqlite3 module
+            try {
+                const sqlite3 = require('sqlite3');
+                console.log('sqlite3 module loaded successfully');
+                console.log('sqlite3 version:', sqlite3.VERSION);
+            } catch (sqliteError) {
+                console.error('sqlite3 module error:', sqliteError.message);
+                throw new Error(`SQLite3 module not available: ${sqliteError.message}`);
+            }
+
+            const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/webapps_hub.db' : './database/webapps_hub.db';
+            console.log('Database path will be:', dbPath);
+
+            console.log('Attempting database connection...');
             await database.connect();
+            console.log('Database connected successfully');
+
+            console.log('Creating tables...');
             await database.createTables();
+            console.log('Tables created successfully');
 
             // Create admin user if it doesn't exist
             const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
@@ -97,7 +138,23 @@ async function initializeDatabase() {
             dbInitialized = true;
             console.log('Database initialized successfully');
         } catch (error) {
-            console.error('Database initialization failed:', error);
+            console.error('=== DATABASE INITIALIZATION FAILED ===');
+            console.error('Error message:', error.message);
+            console.error('Error code:', error.code);
+            console.error('Error errno:', error.errno);
+            console.error('Error stack:', error.stack);
+
+            // Additional debugging for common issues
+            if (error.message.includes('SQLITE_CANTOPEN')) {
+                console.error('DIAGNOSIS: Cannot open database file - check permissions');
+            } else if (error.message.includes('no such file or directory')) {
+                console.error('DIAGNOSIS: Directory does not exist - check path');
+            } else if (error.message.includes('Module not found')) {
+                console.error('DIAGNOSIS: Missing dependency - check package.json');
+            } else if (error.message.includes('Permission denied')) {
+                console.error('DIAGNOSIS: Permission denied - check directory permissions');
+            }
+
             dbInitializationError = error;
             throw error; // Re-throw to prevent function from continuing
         }

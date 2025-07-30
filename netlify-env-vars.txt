@@ -1,0 +1,33 @@
+COPY THESE ENVIRONMENT VARIABLES TO NETLIFY:
+==============================================
+
+Go to: Netlify Dashboard → Site Settings → Environment Variables
+
+Add each variable using "Add a variable" button:
+
+NODE_ENV=production
+JWT_SECRET=7a4c907f73731d71ac33f3a2628a9c935b4656440542bb96e0c1613c513a232a3d1ccf4bb91fe01bf2df17ea2b7fce280a6a5ca59a523856b1e44d4408d614fd
+ADMIN_EMAIL=linhhalinh5@gmail.com
+ADMIN_PASSWORD=admin123
+BCRYPT_ROUNDS=12
+DATABASE_TIMEOUT=10000
+DATABASE_RETRY_ATTEMPTS=5
+DATABASE_RETRY_DELAY=2000
+DATABASE_JOURNAL_MODE=MEMORY
+DATABASE_FOREIGN_KEYS=true
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX_REQUESTS=100
+MAX_FILE_SIZE=5242880
+ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif,image/webp
+
+CRITICAL VARIABLES (Must be set):
+- NODE_ENV
+- JWT_SECRET  
+- ADMIN_EMAIL
+- ADMIN_PASSWORD
+
+After adding all variables:
+1. Go to Deploys tab
+2. Click "Trigger deploy" → "Deploy site"
+3. Wait for deployment to complete
+4. Test: https://showcaseapplication.netlify.app/.netlify/functions/api/health
