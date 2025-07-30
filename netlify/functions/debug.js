@@ -76,35 +76,20 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Database connection test
+        // Database path test (without connecting)
         try {
             const Database = require('../../config/database');
-            const database = new Database();
-            
-            debug.database.configPath = database.dbPath;
-            debug.database.config = database.config;
-            
-            // Try to connect
-            await database.connect();
-            debug.database.connectionSuccess = true;
-            
-            // Try to create tables
-            await database.createTables();
-            debug.database.tablesCreated = true;
-            
-            // Test a simple query
-            const result = await database.get('SELECT 1 as test');
-            debug.database.queryTest = result;
-            
-            await database.close();
-            debug.database.closed = true;
-            
+            debug.database = {
+                dbPath: Database.dbPath,
+                dbName: Database.dbName,
+                getDatabasePath: Database.getDatabasePath(),
+                config: Database.config
+            };
         } catch (error) {
-            debug.database.error = {
+            debug.database.pathError = {
                 message: error.message,
                 code: error.code,
-                errno: error.errno,
-                stack: error.stack
+                errno: error.errno
             };
         }
 
