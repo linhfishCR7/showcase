@@ -4,24 +4,30 @@ class AdminDashboard {
         this.user = null;
         this.currentPage = 'dashboard';
         this.theme = localStorage.getItem('admin_theme') || 'light';
-        
+        this.sessionTimeout = null;
+        this.sessionWarningTimeout = null;
+        this.SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+        this.WARNING_TIME = 5 * 60 * 1000; // 5 minutes before expiry
+
         this.init();
     }
 
     async init() {
         this.initializeTheme();
-        
+        this.initKeyboardShortcuts();
+
         if (this.token) {
             try {
                 await this.verifyToken();
                 this.showDashboard();
+                this.startSessionTimer();
             } catch (error) {
                 this.showLogin();
             }
         } else {
             this.showLogin();
         }
-        
+
         this.initializeEventListeners();
         this.hideLoadingOverlay();
     }
@@ -125,6 +131,7 @@ class AdminDashboard {
                 
                 this.showNotification('Login successful!', 'success');
                 this.showDashboard();
+                this.startSessionTimer();
             } else {
                 throw new Error(data.error || 'Login failed');
             }
@@ -166,11 +173,14 @@ class AdminDashboard {
         } catch (error) {
             console.error('Logout error:', error);
         }
-        
+
+        // Clear session timers
+        this.clearSessionTimers();
+
         this.token = null;
         this.user = null;
         localStorage.removeItem('admin_token');
-        
+
         this.showNotification('Logged out successfully', 'success');
         this.showLogin();
     }
@@ -780,6 +790,13 @@ class AdminDashboard {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            // Validate form
+            const errors = this.validateForm(form);
+            if (errors.length > 0) {
+                this.showNotification(`Please fix the following errors: ${errors.join(', ')}`, 'error');
+                return;
+            }
+
             const submitBtn = form.querySelector('button[type="submit"]');
             const btnText = submitBtn.querySelector('.btn-text');
             const btnSpinner = submitBtn.querySelector('.btn-spinner');
@@ -791,6 +808,13 @@ class AdminDashboard {
 
             try {
                 const formData = new FormData(form);
+
+                // Sanitize text inputs
+                for (const [key, value] of formData.entries()) {
+                    if (typeof value === 'string') {
+                        formData.set(key, this.sanitizeInput(value));
+                    }
+                }
 
                 const url = isEdit ? `/admin/api/applications/${app.id}` : '/admin/api/applications';
                 const method = isEdit ? 'PUT' : 'POST';
@@ -1779,6 +1803,305 @@ class AdminDashboard {
         }
 
         return await response.json();
+    }
+
+    // Session Management
+    startSessionTimer() {
+        this.clearSessionTimers();
+
+        // Set warning timer
+        this.sessionWarningTimeout = setTimeout(() => {
+            this.showSessionWarning();
+        }, this.SESSION_DURATION - this.WARNING_TIME);
+
+        // Set logout timer
+        this.sessionTimeout = setTimeout(() => {
+            this.handleSessionExpiry();
+        }, this.SESSION_DURATION);
+    }
+
+    clearSessionTimers() {
+        if (this.sessionTimeout) {
+            clearTimeout(this.sessionTimeout);
+            this.sessionTimeout = null;
+        }
+        if (this.sessionWarningTimeout) {
+            clearTimeout(this.sessionWarningTimeout);
+            this.sessionWarningTimeout = null;
+        }
+    }
+
+    showSessionWarning() {
+        const modal = this.createModal('Session Expiring', `
+            <div class="session-warning">
+                <div class="warning-icon">⚠️</div>
+                <h3>Your session will expire in 5 minutes</h3>
+                <p>Click "Stay Logged In" to extend your session, or you will be automatically logged out.</p>
+                <div class="session-actions">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Logout Now</button>
+                    <button class="btn btn-primary" onclick="adminDashboard.extendSession()">Stay Logged In</button>
+                </div>
+            </div>
+        `, 'medium');
+
+        // Auto-close warning after 4 minutes if no action
+        setTimeout(() => {
+            if (document.body.contains(modal)) {
+                modal.remove();
+            }
+        }, 4 * 60 * 1000);
+    }
+
+    extendSession() {
+        // Close warning modal
+        const modal = document.querySelector('.modal');
+        if (modal) modal.remove();
+
+        // Restart session timer
+        this.startSessionTimer();
+        this.showNotification('Session extended successfully', 'success');
+    }
+
+    handleSessionExpiry() {
+        this.showNotification('Session expired. Please log in again.', 'warning');
+        this.handleLogout();
+    }
+
+    // Enhanced form validation
+    validateForm(form) {
+        const errors = [];
+        const requiredFields = form.querySelectorAll('[required]');
+
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                errors.push(`${field.name || field.id} is required`);
+                field.classList.add('error');
+            } else {
+                field.classList.remove('error');
+            }
+        });
+
+        // Email validation
+        const emailFields = form.querySelectorAll('input[type="email"]');
+        emailFields.forEach(field => {
+            if (field.value && !this.isValidEmail(field.value)) {
+                errors.push(`${field.name || field.id} must be a valid email address`);
+                field.classList.add('error');
+            }
+        });
+
+        // URL validation
+        const urlFields = form.querySelectorAll('input[type="url"]');
+        urlFields.forEach(field => {
+            if (field.value && !this.isValidUrl(field.value)) {
+                errors.push(`${field.name || field.id} must be a valid URL`);
+                field.classList.add('error');
+            }
+        });
+
+        return errors;
+    }
+
+    isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    // Input sanitization
+    sanitizeInput(input) {
+        if (typeof input !== 'string') return input;
+
+        return input
+            .replace(/[<>]/g, '') // Remove potential HTML tags
+            .trim();
+    }
+
+    // Enhanced notification system with types
+    showNotification(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('notification-container');
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-icon">${icons[type] || icons.info}</span>
+                <span class="notification-message">${this.escapeHtml(message)}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+
+        container.appendChild(notification);
+
+        // Animate in
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+
+        // Remove after delay
+        setTimeout(() => {
+            if (container.contains(notification)) {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (container.contains(notification)) {
+                        container.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, duration);
+    }
+
+    // Keyboard shortcuts
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + K for quick search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                this.showQuickSearch();
+            }
+
+            // Escape to close modals
+            if (e.key === 'Escape') {
+                const modal = document.querySelector('.modal');
+                if (modal) {
+                    modal.remove();
+                }
+            }
+
+            // Ctrl/Cmd + S to save forms
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                const activeForm = document.querySelector('.modal form');
+                if (activeForm) {
+                    e.preventDefault();
+                    activeForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+    }
+
+    showQuickSearch() {
+        const modal = this.createModal('Quick Search', `
+            <div class="quick-search">
+                <input type="text" id="quick-search-input" placeholder="Search applications, testimonials, messages..." class="search-input">
+                <div class="search-results" id="search-results">
+                    <div class="search-hint">Start typing to search...</div>
+                </div>
+            </div>
+        `, 'medium');
+
+        const input = modal.querySelector('#quick-search-input');
+        const results = modal.querySelector('#search-results');
+
+        input.focus();
+
+        let searchTimeout;
+        input.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.performQuickSearch(e.target.value, results);
+            }, 300);
+        });
+    }
+
+    async performQuickSearch(query, resultsContainer) {
+        if (!query.trim()) {
+            resultsContainer.innerHTML = '<div class="search-hint">Start typing to search...</div>';
+            return;
+        }
+
+        resultsContainer.innerHTML = '<div class="search-loading">Searching...</div>';
+
+        try {
+            // Search across multiple endpoints
+            const [apps, testimonials, messages] = await Promise.all([
+                this.apiCall('/admin/api/applications').catch(() => ({ applications: [] })),
+                this.apiCall('/admin/api/testimonials').catch(() => ({ testimonials: [] })),
+                this.apiCall('/admin/api/contact-messages').catch(() => ({ messages: [] }))
+            ]);
+
+            const results = [];
+            const searchTerm = query.toLowerCase();
+
+            // Search applications
+            apps.applications?.forEach(app => {
+                if (app.name.toLowerCase().includes(searchTerm) ||
+                    app.description.toLowerCase().includes(searchTerm)) {
+                    results.push({
+                        type: 'application',
+                        title: app.name,
+                        subtitle: app.category,
+                        action: () => {
+                            this.navigateToPage('applications');
+                            document.querySelector('.modal').remove();
+                        }
+                    });
+                }
+            });
+
+            // Search testimonials
+            testimonials.testimonials?.forEach(testimonial => {
+                if (testimonial.name.toLowerCase().includes(searchTerm) ||
+                    testimonial.content.toLowerCase().includes(searchTerm)) {
+                    results.push({
+                        type: 'testimonial',
+                        title: testimonial.name,
+                        subtitle: testimonial.content.substring(0, 50) + '...',
+                        action: () => {
+                            this.navigateToPage('testimonials');
+                            document.querySelector('.modal').remove();
+                        }
+                    });
+                }
+            });
+
+            // Search messages
+            messages.messages?.forEach(message => {
+                if (message.name.toLowerCase().includes(searchTerm) ||
+                    message.email.toLowerCase().includes(searchTerm) ||
+                    message.message.toLowerCase().includes(searchTerm)) {
+                    results.push({
+                        type: 'message',
+                        title: message.name,
+                        subtitle: message.email,
+                        action: () => {
+                            this.navigateToPage('messages');
+                            document.querySelector('.modal').remove();
+                        }
+                    });
+                }
+            });
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="search-no-results">No results found</div>';
+            } else {
+                resultsContainer.innerHTML = results.map(result => `
+                    <div class="search-result-item" onclick="(${result.action.toString()})()">
+                        <div class="result-type">${result.type}</div>
+                        <div class="result-content">
+                            <div class="result-title">${this.escapeHtml(result.title)}</div>
+                            <div class="result-subtitle">${this.escapeHtml(result.subtitle)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (error) {
+            resultsContainer.innerHTML = '<div class="search-error">Search failed. Please try again.</div>';
+        }
     }
 }
 
