@@ -176,9 +176,9 @@ database/*.sqlite3
 *.sqlite
 *.sqlite3
 
-# Netlify build output
+# Netlify build output (exclude build artifacts, but keep source functions)
 .netlify/
-functions/
+# Note: Keep netlify/functions/ in repository for serverless deployment
 
 # Additional OS files
 .DS_Store
