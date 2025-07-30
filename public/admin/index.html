@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebApps Hub - Admin Dashboard</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" type="image/x-icon" href="../img/logo.png">
+    <meta name="robots" content="noindex, nofollow">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Loading dashboard...</p>
+    </div>
+
+    <!-- Login Screen -->
+    <div class="login-container" id="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <img src="../img/logo.svg" alt="WebApps Hub" class="login-logo">
+                <h1>Admin Dashboard</h1>
+                <p>Sign in to manage your web applications</p>
+            </div>
+            <form class="login-form" id="login-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="login-btn">
+                    <span class="btn-text">Sign In</span>
+                    <span class="btn-spinner" style="display: none;">
+                        <div class="spinner"></div>
+                    </span>
+                </button>
+                <div class="login-error" id="login-error" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard-container" id="dashboard-container" style="display: none;">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="../img/logo.svg" alt="WebApps Hub" class="sidebar-logo">
+                <h2>WebApps Hub</h2>
+                <button class="sidebar-toggle" id="sidebar-toggle">
+                    <span class="hamburger"></span>
+                </button>
+            </div>
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                            <span class="nav-icon">📊</span>
+                            <span class="nav-text">Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#applications" class="nav-link" data-page="applications">
+                            <span class="nav-icon">📱</span>
+                            <span class="nav-text">Applications</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#testimonials" class="nav-link" data-page="testimonials">
+                            <span class="nav-icon">💬</span>
+                            <span class="nav-text">Testimonials</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#messages" class="nav-link" data-page="messages">
+                            <span class="nav-icon">📧</span>
+                            <span class="nav-text">Messages</span>
+                            <span class="nav-badge" id="messages-badge">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#newsletter" class="nav-link" data-page="newsletter">
+                            <span class="nav-icon">📬</span>
+                            <span class="nav-text">Newsletter</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#content" class="nav-link" data-page="content">
+                            <span class="nav-icon">📝</span>
+                            <span class="nav-text">Content</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#analytics" class="nav-link" data-page="analytics">
+                            <span class="nav-icon">📈</span>
+                            <span class="nav-text">Analytics</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info" id="user-info">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-details">
+                        <div class="user-name" id="user-name">Admin</div>
+                        <div class="user-role" id="user-role">Administrator</div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="logout-btn">
+                    <span class="nav-icon">🚪</span>
+                    Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                        <span class="hamburger"></span>
+                    </button>
+                    <h1 class="page-title" id="page-title">Dashboard</h1>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-primary" id="refresh-btn">
+                        <span class="nav-icon">🔄</span>
+                        Refresh
+                    </button>
+                    <div class="theme-toggle">
+                        <button class="theme-btn" id="theme-toggle">
+                            <span class="theme-icon">🌙</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="page-content">
+                <!-- Dashboard Page -->
+                <div class="page" id="dashboard-page">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📱</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="total-apps">0</div>
+                                <div class="stat-label">Total Apps</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="active-apps">0</div>
+                                <div class="stat-label">Active Apps</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📧</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="unread-messages">0</div>
+                                <div class="stat-label">Unread Messages</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📬</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="newsletter-subscribers">0</div>
+                                <div class="stat-label">Newsletter Subscribers</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🚀</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="total-launches">0</div>
+                                <div class="stat-label">Total Launches</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📥</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="total-installs">0</div>
+                                <div class="stat-label">Total Installs</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3>Recent Activity</h3>
+                            </div>
+                            <div class="card-content">
+                                <div class="activity-list" id="recent-activity">
+                                    <div class="activity-item">
+                                        <div class="activity-icon">📱</div>
+                                        <div class="activity-content">
+                                            <div class="activity-text">Loading recent activity...</div>
+                                            <div class="activity-time">Just now</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3>Quick Actions</h3>
+                            </div>
+                            <div class="card-content">
+                                <div class="quick-actions">
+                                    <button class="quick-action-btn" data-action="add-app">
+                                        <span class="action-icon">➕</span>
+                                        <span class="action-text">Add New App</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="add-testimonial">
+                                        <span class="action-icon">💬</span>
+                                        <span class="action-text">Add Testimonial</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="view-messages">
+                                        <span class="action-icon">📧</span>
+                                        <span class="action-text">View Messages</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="edit-content">
+                                        <span class="action-icon">📝</span>
+                                        <span class="action-text">Edit Content</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Applications Page -->
+                <div class="page" id="applications-page" style="display: none;">
+                    <div class="page-header">
+                        <div class="page-header-left">
+                            <h2>Applications Management</h2>
+                            <p>Manage your web applications</p>
+                        </div>
+                        <div class="page-header-right">
+                            <button class="btn btn-primary" id="add-app-btn">
+                                <span class="nav-icon">➕</span>
+                                Add Application
+                            </button>
+                        </div>
+                    </div>
+                    <div class="page-body">
+                        <div class="table-container">
+                            <table class="data-table" id="applications-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Category</th>
+                                        <th>Status</th>
+                                        <th>Launches</th>
+                                        <th>Installs</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="applications-tbody">
+                                    <tr>
+                                        <td colspan="7" class="loading-cell">Loading applications...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other pages will be loaded dynamically -->
+                <div class="page" id="testimonials-page" style="display: none;">
+                    <div class="page-header">
+                        <h2>Testimonials Management</h2>
+                        <button class="btn btn-primary" id="add-testimonial-btn">Add Testimonial</button>
+                    </div>
+                    <div class="page-body" id="testimonials-content">
+                        Loading testimonials...
+                    </div>
+                </div>
+
+                <div class="page" id="messages-page" style="display: none;">
+                    <div class="page-header">
+                        <h2>Contact Messages</h2>
+                    </div>
+                    <div class="page-body" id="messages-content">
+                        Loading messages...
+                    </div>
+                </div>
+
+                <div class="page" id="newsletter-page" style="display: none;">
+                    <div class="page-header">
+                        <h2>Newsletter Subscribers</h2>
+                    </div>
+                    <div class="page-body" id="newsletter-content">
+                        Loading subscribers...
+                    </div>
+                </div>
+
+                <div class="page" id="content-page" style="display: none;">
+                    <div class="page-header">
+                        <h2>Content Management</h2>
+                    </div>
+                    <div class="page-body" id="content-content">
+                        Loading content...
+                    </div>
+                </div>
+
+                <div class="page" id="analytics-page" style="display: none;">
+                    <div class="page-header">
+                        <h2>Analytics</h2>
+                    </div>
+                    <div class="page-body" id="analytics-content">
+                        Loading analytics...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals will be inserted here dynamically -->
+    <div id="modal-container"></div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notification-container"></div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>

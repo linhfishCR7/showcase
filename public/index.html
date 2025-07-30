@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Discover amazing web applications - Personal Expense Tracker, Digital Drawing Canvas, and more! Free, powerful, and installable as PWAs.">
+    <meta name="keywords" content="web apps, PWA, expense tracker, drawing canvas, productivity, creative tools">
+    <meta name="author" content="Web App Collection">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.com/">
+    <meta property="og:title" content="WebApps Hub - Amazing Web Applications Collection">
+    <meta property="og:description" content="Discover amazing web applications - Personal Expense Tracker, Digital Drawing Canvas, and more! Free, powerful, and installable as PWAs.">
+    <meta property="og:image" content="img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://your-domain.com/">
+    <meta property="twitter:title" content="WebApps Hub - Amazing Web Applications Collection">
+    <meta property="twitter:description" content="Discover amazing web applications - Personal Expense Tracker, Digital Drawing Canvas, and more! Free, powerful, and installable as PWAs.">
+    <meta property="twitter:image" content="img/og-image.png">
+
+    <title>Amazing Web Apps Collection - Free PWA Tools</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+
+    <!-- Favicons and Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="img/logo-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="img/logo.png">
+
+    <!-- Apple PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="WebApps Hub">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="img/logo.svg" alt="Web Apps Collection" class="logo-img">
+                <span class="logo-text">WebApps Hub</span>
+            </div>
+            <div class="nav-menu" id="nav-menu">
+                <a href="#home" class="nav-link">Home</a>
+                <a href="#apps" class="nav-link">Apps</a>
+                <a href="#about" class="nav-link">About</a>
+                <a href="#contact" class="nav-link">Contact</a>
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title" id="hero-title">
+                    Amazing <span class="gradient-text">Web Apps</span>
+                    <br>For Everyone
+                </h1>
+                <p class="hero-description" id="hero-description">
+                    Discover powerful, free web applications that work on any device. 
+                    Install them as native apps and enjoy seamless experiences across all your devices.
+                </p>
+                <div class="hero-buttons">
+                    <a href="#apps" class="btn btn-primary">Explore Apps</a>
+                    <a href="#about" class="btn btn-secondary">Learn More</a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number" data-target="2" id="stat-apps">0</span>
+                        <span class="stat-label">Apps Available</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" data-target="100" id="stat-free">0</span>
+                        <span class="stat-label">% Free</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" data-target="0" id="stat-users">0</span>
+                        <span class="stat-label">Happy Users</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="floating-cards">
+                    <div class="floating-card card-1">
+                        <div class="card-icon">💰</div>
+                        <div class="card-title">Expense Tracker</div>
+                    </div>
+                    <div class="floating-card card-2">
+                        <div class="card-icon">🎨</div>
+                        <div class="card-title">Drawing Canvas</div>
+                    </div>
+                    <div class="floating-card card-3">
+                        <div class="card-icon">📱</div>
+                        <div class="card-title">PWA Ready</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Apps Section -->
+    <section id="apps" class="apps-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Our Amazing Apps</h2>
+                <p class="section-description">
+                    Powerful web applications designed to make your life easier and more productive.
+                </p>
+            </div>
+
+            <!-- Search and Filter -->
+            <div class="apps-controls">
+                <div class="search-container">
+                    <input type="text" id="app-search" placeholder="Search apps..." class="search-input">
+                    <span class="search-icon">🔍</span>
+                </div>
+                <div class="filter-container">
+                    <select id="category-filter" class="filter-select">
+                        <option value="">All Categories</option>
+                        <option value="productivity">Productivity</option>
+                        <option value="creative">Creative</option>
+                        <option value="finance">Finance</option>
+                        <option value="utility">Utility</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Apps Grid -->
+            <div class="apps-grid" id="apps-grid">
+                <!-- Apps will be loaded dynamically -->
+                <div class="loading-apps">
+                    <div class="loading-spinner"></div>
+                    <p>Loading amazing apps...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <div class="container">
+            <div class="about-content" id="about-content">
+                <!-- Content will be loaded dynamically -->
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <p>Loading content...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials-section">
+        <div class="container">
+            <h2 class="section-title">What Users Say</h2>
+            <div class="testimonials-grid" id="testimonials-grid">
+                <!-- Testimonials will be loaded dynamically -->
+                <div class="loading-testimonials">
+                    <div class="loading-spinner"></div>
+                    <p>Loading testimonials...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter Section -->
+    <section class="newsletter-section">
+        <div class="container">
+            <div class="newsletter-content">
+                <h2 class="newsletter-title">Stay Updated</h2>
+                <p class="newsletter-description">
+                    Get notified when we release new apps and features. No spam, just awesome updates!
+                </p>
+                <form class="newsletter-form" id="newsletter-form">
+                    <input type="email" placeholder="Enter your email" class="newsletter-input" required>
+                    <button type="submit" class="btn btn-primary">Subscribe</button>
+                </form>
+                <p class="newsletter-privacy">
+                    We respect your privacy. Unsubscribe at any time.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <div class="contact-content" id="contact-content">
+                <!-- Content will be loaded dynamically -->
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <p>Loading contact information...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <img src="img/logo.svg" alt="WebApps Hub" class="footer-logo-img">
+                        <span class="footer-logo-text">WebApps Hub</span>
+                    </div>
+                    <p class="footer-description">
+                        Amazing web applications for everyone. Free, powerful, and privacy-focused.
+                    </p>
+                    <div class="social-links">
+                        <a href="#" class="social-link" aria-label="Twitter">🐦</a>
+                        <a href="#" class="social-link" aria-label="GitHub">🐙</a>
+                        <a href="#" class="social-link" aria-label="LinkedIn">💼</a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h3 class="footer-title">Apps</h3>
+                    <ul class="footer-links" id="footer-apps-links">
+                        <!-- Links will be populated dynamically -->
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3 class="footer-title">Resources</h3>
+                    <ul class="footer-links">
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                        <li><a href="#" id="pwa-guide">PWA Installation Guide</a></li>
+                        <li><a href="#" id="privacy-policy">Privacy Policy</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3 class="footer-title">Support</h3>
+                    <ul class="footer-links">
+                        <li><a href="#contact">Get Help</a></li>
+                        <li><a href="#contact">Report Bug</a></li>
+                        <li><a href="#contact">Feature Request</a></li>
+                        <li><a href="#newsletter">Newsletter</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 WebApps Hub. All rights reserved. Made with ❤️ for the web.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- PWA Installation Modal -->
+    <div class="modal" id="pwa-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Install as App</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="install-instructions">
+                    <div class="install-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Desktop (Chrome/Edge)</h4>
+                            <p>Look for the install icon in your browser's address bar and click it.</p>
+                        </div>
+                    </div>
+                    <div class="install-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Mobile (Android)</h4>
+                            <p>Tap the menu button (⋮) and select "Add to Home Screen".</p>
+                        </div>
+                    </div>
+                    <div class="install-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Mobile (iOS)</h4>
+                            <p>Tap the share button (□↗) and select "Add to Home Screen".</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Loading amazing apps...</p>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notification-container"></div>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal" id="privacy-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Privacy Policy</h3>
+                <button class="modal-close" id="privacy-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="privacy-content">
+                    <h4>Data Collection</h4>
+                    <p>WebApps Hub is designed with privacy in mind. All applications work locally in your browser and do not collect or transmit personal data to external servers.</p>
+
+                    <h4>Local Storage</h4>
+                    <p>Some applications may use your browser's local storage to save your work and preferences. This data remains on your device and is not shared with us or third parties.</p>
+
+                    <h4>Analytics</h4>
+                    <p>We may use privacy-focused analytics to understand how our applications are used, but this data is anonymized and cannot be traced back to individual users.</p>
+
+                    <h4>Third-Party Services</h4>
+                    <p>Our applications do not integrate with third-party services that collect personal data. All functionality is self-contained within each application.</p>
+
+                    <h4>Contact</h4>
+                    <p>If you have any questions about this privacy policy, please contact us through the contact form on this website.</p>
+
+                    <p><small>Last updated: December 2024</small></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebApps Hub Logo Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+        }
+        .canvas-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin: 10px;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        .size-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+        }
+        .download-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .download-link {
+            background: #4ecdc4;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .download-link:hover {
+            background: #44a08d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 WebApps Hub Logo Generator</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            Generate PNG logos in multiple sizes for your PWA manifest and other uses.
+        </p>
+
+        <div class="controls">
+            <button onclick="generateAllLogos()">Generate All Logo Sizes</button>
+            <button onclick="generateScreenshots()">Generate Screenshots</button>
+            <button onclick="generateOGImage()">Generate OG Image</button>
+        </div>
+
+        <div class="canvas-container" id="canvas-container">
+            <!-- Canvases will be added here -->
+        </div>
+
+        <div class="download-links" id="download-links">
+            <!-- Download links will be added here -->
+        </div>
+
+        <div class="size-info">
+            <h3>📱 Required Sizes:</h3>
+            <ul>
+                <li><strong>512x512</strong> - PWA manifest icon (large)</li>
+                <li><strong>192x192</strong> - PWA manifest icon (standard)</li>
+                <li><strong>180x180</strong> - Apple touch icon</li>
+                <li><strong>32x32</strong> - Favicon</li>
+                <li><strong>16x16</strong> - Small favicon</li>
+            </ul>
+        </div>
+
+        <div class="size-info">
+            <h3>🖼️ Additional Assets:</h3>
+            <ul>
+                <li><strong>1200x630</strong> - Open Graph image for social sharing</li>
+                <li><strong>1280x720</strong> - PWA screenshot (wide)</li>
+                <li><strong>720x1280</strong> - PWA screenshot (narrow)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function createCanvas(width, height, id) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.id = id;
+            return canvas;
+        }
+
+        function drawLogo(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            const centerX = size / 2;
+            const centerY = size / 2;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            
+            // Draw rounded rectangle background
+            const cornerRadius = size * 0.15;
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, cornerRadius);
+            ctx.fill();
+            
+            // Draw main hub circle
+            const hubRadius = size * 0.15;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, hubRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw app circles around hub
+            const appRadius = size * 0.065;
+            const orbitRadius = size * 0.25;
+            const apps = [
+                { angle: -Math.PI/4, color: '#4ecdc4', icon: '$', offset: 0 },
+                { angle: Math.PI/4, color: '#ff6b6b', icon: '🎨', offset: 0 },
+                { angle: 3*Math.PI/4, color: '#ffd93d', icon: '⚡', offset: 0 },
+                { angle: -3*Math.PI/4, color: '#9c27b0', icon: '🚀', offset: 0 }
+            ];
+            
+            apps.forEach(app => {
+                const x = centerX + Math.cos(app.angle) * orbitRadius;
+                const y = centerY + Math.sin(app.angle) * orbitRadius;
+                
+                // Draw app circle
+                ctx.fillStyle = app.color + 'CC'; // Add transparency
+                ctx.beginPath();
+                ctx.arc(x, y, appRadius, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Draw connection line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.lineWidth = size * 0.006;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(
+                    centerX + Math.cos(app.angle) * (hubRadius + 5),
+                    centerY + Math.sin(app.angle) * (hubRadius + 5)
+                );
+                ctx.lineTo(
+                    x - Math.cos(app.angle) * (appRadius + 5),
+                    y - Math.sin(app.angle) * (appRadius + 5)
+                );
+                ctx.stroke();
+                
+                // Draw app icon
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${appRadius * 0.8}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (app.icon === '$') {
+                    ctx.fillText(app.icon, x, y);
+                } else {
+                    ctx.fillText(app.icon, x, y);
+                }
+            });
+            
+            // Draw "HUB" text in center
+            ctx.fillStyle = '#667eea';
+            ctx.font = `bold ${hubRadius * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('HUB', centerX, centerY);
+        }
+
+        function generateAllLogos() {
+            const container = document.getElementById('canvas-container');
+            const downloadLinks = document.getElementById('download-links');
+            
+            // Clear existing content
+            container.innerHTML = '';
+            downloadLinks.innerHTML = '';
+            
+            const sizes = [
+                { width: 512, height: 512, name: 'logo-512x512' },
+                { width: 192, height: 192, name: 'logo-192x192' },
+                { width: 180, height: 180, name: 'apple-touch-icon' },
+                { width: 32, height: 32, name: 'favicon-32x32' },
+                { width: 16, height: 16, name: 'favicon-16x16' }
+            ];
+            
+            sizes.forEach(size => {
+                const canvas = createCanvas(size.width, size.height, size.name);
+                drawLogo(canvas, size.width);
+                
+                // Add canvas to container
+                const canvasDiv = document.createElement('div');
+                canvasDiv.innerHTML = `<h4>${size.name} (${size.width}x${size.height})</h4>`;
+                canvasDiv.appendChild(canvas);
+                container.appendChild(canvasDiv);
+                
+                // Create download link
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${size.name}.png`;
+                    link.textContent = `Download ${size.name}.png`;
+                    link.className = 'download-link';
+                    downloadLinks.appendChild(link);
+                });
+            });
+        }
+
+        function generateScreenshots() {
+            const container = document.getElementById('canvas-container');
+            const downloadLinks = document.getElementById('download-links');
+            
+            // Wide screenshot (1280x720)
+            const wideCanvas = createCanvas(1280, 720, 'screenshot-wide');
+            const wideCtx = wideCanvas.getContext('2d');
+            
+            // Create gradient background
+            const wideGradient = wideCtx.createLinearGradient(0, 0, 1280, 720);
+            wideGradient.addColorStop(0, '#667eea');
+            wideGradient.addColorStop(1, '#764ba2');
+            wideCtx.fillStyle = wideGradient;
+            wideCtx.fillRect(0, 0, 1280, 720);
+            
+            // Add title
+            wideCtx.fillStyle = 'white';
+            wideCtx.font = 'bold 48px Arial';
+            wideCtx.textAlign = 'center';
+            wideCtx.fillText('WebApps Hub', 640, 200);
+            
+            wideCtx.font = '24px Arial';
+            wideCtx.fillText('Amazing Web Applications For Everyone', 640, 250);
+            
+            // Draw logo in center
+            drawLogo(wideCanvas, 200);
+            
+            // Add to container
+            const wideDiv = document.createElement('div');
+            wideDiv.innerHTML = '<h4>Wide Screenshot (1280x720)</h4>';
+            wideDiv.appendChild(wideCanvas);
+            container.appendChild(wideDiv);
+            
+            // Narrow screenshot (720x1280)
+            const narrowCanvas = createCanvas(720, 1280, 'screenshot-narrow');
+            const narrowCtx = narrowCanvas.getContext('2d');
+            
+            // Create gradient background
+            const narrowGradient = narrowCtx.createLinearGradient(0, 0, 720, 1280);
+            narrowGradient.addColorStop(0, '#667eea');
+            narrowGradient.addColorStop(1, '#764ba2');
+            narrowCtx.fillStyle = narrowGradient;
+            narrowCtx.fillRect(0, 0, 720, 1280);
+            
+            // Add title
+            narrowCtx.fillStyle = 'white';
+            narrowCtx.font = 'bold 36px Arial';
+            narrowCtx.textAlign = 'center';
+            narrowCtx.fillText('WebApps Hub', 360, 300);
+            
+            narrowCtx.font = '18px Arial';
+            narrowCtx.fillText('Amazing Web Applications', 360, 350);
+            narrowCtx.fillText('For Everyone', 360, 380);
+            
+            // Add to container
+            const narrowDiv = document.createElement('div');
+            narrowDiv.innerHTML = '<h4>Narrow Screenshot (720x1280)</h4>';
+            narrowDiv.appendChild(narrowCanvas);
+            container.appendChild(narrowDiv);
+            
+            // Create download links
+            wideCanvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'screenshot-wide.png';
+                link.textContent = 'Download Wide Screenshot';
+                link.className = 'download-link';
+                downloadLinks.appendChild(link);
+            });
+            
+            narrowCanvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'screenshot-narrow.png';
+                link.textContent = 'Download Narrow Screenshot';
+                link.className = 'download-link';
+                downloadLinks.appendChild(link);
+            });
+        }
+
+        function generateOGImage() {
+            const container = document.getElementById('canvas-container');
+            const downloadLinks = document.getElementById('download-links');
+            
+            const canvas = createCanvas(1200, 630, 'og-image');
+            const ctx = canvas.getContext('2d');
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 1200, 630);
+            
+            // Add title
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 64px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('WebApps Hub', 600, 200);
+            
+            ctx.font = '32px Arial';
+            ctx.fillText('Amazing Web Applications Collection', 600, 260);
+            
+            ctx.font = '24px Arial';
+            ctx.fillText('Free • Powerful • Installable as PWAs', 600, 320);
+            
+            // Draw smaller logo
+            const logoSize = 150;
+            const logoX = 600 - logoSize/2;
+            const logoY = 400;
+            
+            // Create a temporary canvas for the logo
+            const logoCanvas = createCanvas(logoSize, logoSize, 'temp-logo');
+            drawLogo(logoCanvas, logoSize);
+            ctx.drawImage(logoCanvas, logoX, logoY);
+            
+            // Add to container
+            const ogDiv = document.createElement('div');
+            ogDiv.innerHTML = '<h4>Open Graph Image (1200x630)</h4>';
+            ogDiv.appendChild(canvas);
+            container.appendChild(ogDiv);
+            
+            // Create download link
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'og-image.png';
+                link.textContent = 'Download OG Image';
+                link.className = 'download-link';
+                downloadLinks.appendChild(link);
+            });
+        }
+
+        // Add roundRect polyfill for older browsers
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radius) {
+                this.beginPath();
+                this.moveTo(x + radius, y);
+                this.lineTo(x + width - radius, y);
+                this.quadraticCurveTo(x + width, y, x + width, y + radius);
+                this.lineTo(x + width, y + height - radius);
+                this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                this.lineTo(x + radius, y + height);
+                this.quadraticCurveTo(x, y + height, x, y + height - radius);
+                this.lineTo(x, y + radius);
+                this.quadraticCurveTo(x, y, x + radius, y);
+                this.closePath();
+            };
+        }
+
+        // Auto-generate logos on page load
+        window.addEventListener('load', () => {
+            setTimeout(generateAllLogos, 500);
+        });
+    </script>
+</body>
+</html>
