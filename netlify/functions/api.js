@@ -170,11 +170,70 @@ app.use('/admin/api', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
+    res.json({
+        status: 'ok',
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development'
     });
+});
+
+// Debug endpoint that doesn't require database
+app.get('/api/debug', (req, res) => {
+    const fs = require('fs');
+    const diagnostics = {
+        timestamp: new Date().toISOString(),
+        version: '2.0', // To verify deployment
+        environment: {
+            NODE_ENV: process.env.NODE_ENV,
+            hasJWT_SECRET: !!process.env.JWT_SECRET,
+            hasADMIN_EMAIL: !!process.env.ADMIN_EMAIL,
+            hasADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+            ADMIN_EMAIL: process.env.ADMIN_EMAIL, // Safe to show
+            platform: process.platform,
+            arch: process.arch,
+            nodeVersion: process.version
+        },
+        filesystem: {},
+        sqlite3: {}
+    };
+
+    // Test /tmp directory
+    try {
+        const tmpStats = fs.statSync('/tmp');
+        diagnostics.filesystem = {
+            tmpExists: tmpStats.isDirectory(),
+            tmpPermissions: tmpStats.mode.toString(8),
+            tmpWritable: false
+        };
+
+        // Test write
+        const testFile = '/tmp/test-write.txt';
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        diagnostics.filesystem.tmpWritable = true;
+    } catch (fsError) {
+        diagnostics.filesystem = {
+            tmpExists: false,
+            tmpWritable: false,
+            error: fsError.message
+        };
+    }
+
+    // Test SQLite3
+    try {
+        const sqlite3 = require('sqlite3');
+        diagnostics.sqlite3 = {
+            available: true,
+            version: sqlite3.VERSION
+        };
+    } catch (sqliteError) {
+        diagnostics.sqlite3 = {
+            available: false,
+            error: sqliteError.message
+        };
+    }
+
+    res.json(diagnostics);
 });
 
 // Error handling middleware
