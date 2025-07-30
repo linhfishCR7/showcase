@@ -40,15 +40,24 @@ class Database {
     }
 
     getDatabasePath() {
+        // Debug environment
+        console.log('getDatabasePath - NODE_ENV:', process.env.NODE_ENV);
+        console.log('getDatabasePath - DATABASE_PATH:', process.env.DATABASE_PATH);
+        console.log('getDatabasePath - dbName:', this.dbName);
+
         // Use explicit DATABASE_PATH if provided
         if (process.env.DATABASE_PATH) {
+            console.log('Using explicit DATABASE_PATH:', process.env.DATABASE_PATH);
             return process.env.DATABASE_PATH;
         }
 
         // Auto-configure based on environment
-        return process.env.NODE_ENV === 'production'
+        const path = process.env.NODE_ENV === 'production'
             ? `/tmp/${this.dbName}`
             : `./database/${this.dbName}`;
+
+        console.log('Auto-configured database path:', path);
+        return path;
     }
 
     async connect() {
@@ -77,11 +86,21 @@ class Database {
 
     async connectOnce() {
         return new Promise((resolve, reject) => {
+            // Debug database path
+            console.log('Database path:', this.dbPath);
+            console.log('Database directory:', path.dirname(this.dbPath));
+            console.log('NODE_ENV:', process.env.NODE_ENV);
+
             // Ensure database directory exists
             const dbDir = path.dirname(this.dbPath);
             const fs = require('fs');
-            if (!fs.existsSync(dbDir)) {
+
+            // For /tmp, we don't need to create the directory
+            if (dbDir !== '/tmp' && !fs.existsSync(dbDir)) {
+                console.log('Creating directory:', dbDir);
                 fs.mkdirSync(dbDir, { recursive: true });
+            } else {
+                console.log('Directory exists or is /tmp:', dbDir);
             }
 
             const timeout = setTimeout(() => {
