@@ -208,6 +208,61 @@ const handler = async (event, context) => {
         return serverlessHandler(event, context);
     } catch (error) {
         console.error('Function initialization failed:', error);
+        // Create detailed diagnostic information
+        const diagnostics = {
+            timestamp: new Date().toISOString(),
+            error: {
+                message: error.message,
+                code: error.code,
+                errno: error.errno
+            },
+            environment: {
+                NODE_ENV: process.env.NODE_ENV,
+                hasJWT_SECRET: !!process.env.JWT_SECRET,
+                hasADMIN_EMAIL: !!process.env.ADMIN_EMAIL,
+                hasADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+                platform: process.platform,
+                arch: process.arch,
+                nodeVersion: process.version
+            }
+        };
+
+        // Add filesystem diagnostics
+        try {
+            const fs = require('fs');
+            const tmpStats = fs.statSync('/tmp');
+            diagnostics.filesystem = {
+                tmpExists: tmpStats.isDirectory(),
+                tmpPermissions: tmpStats.mode.toString(8)
+            };
+
+            // Test write
+            const testFile = '/tmp/test-write.txt';
+            fs.writeFileSync(testFile, 'test');
+            fs.unlinkSync(testFile);
+            diagnostics.filesystem.tmpWritable = true;
+        } catch (fsError) {
+            diagnostics.filesystem = {
+                tmpExists: false,
+                tmpWritable: false,
+                error: fsError.message
+            };
+        }
+
+        // Add SQLite diagnostics
+        try {
+            const sqlite3 = require('sqlite3');
+            diagnostics.sqlite3 = {
+                available: true,
+                version: sqlite3.VERSION
+            };
+        } catch (sqliteError) {
+            diagnostics.sqlite3 = {
+                available: false,
+                error: sqliteError.message
+            };
+        }
+
         return {
             statusCode: 500,
             headers: {
@@ -219,8 +274,8 @@ const handler = async (event, context) => {
             body: JSON.stringify({
                 error: 'Internal server error',
                 message: 'Database initialization failed',
-                details: process.env.NODE_ENV === 'development' ? error.message : undefined
-            })
+                diagnostics: diagnostics
+            }, null, 2)
         };
     }
 };
